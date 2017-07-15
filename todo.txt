@@ -1,0 +1,3 @@
+split by day in list all
+read regex or patterns from jrnl_highlights
+add usaje and examples in README

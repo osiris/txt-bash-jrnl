@@ -1,0 +1,3 @@
+2017-07-15 19:54 fix `jrnl` with *shellcheck*
+
+  @ 00:50 hs

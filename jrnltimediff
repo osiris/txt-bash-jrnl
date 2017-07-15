@@ -1,0 +1,40 @@
+#!/bin/bash
+
+# This script comes with ABSOLUTELY NO WARRANTY, use at own risk
+# Copyright (C) 2017 Osiris Alejandro Gomez <osiris@gcoop.coop>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+die() {
+  echo "$1"
+  exit 1
+}
+
+[[   -z "$1" ]] && exit 1
+[[ ! -e "$1" ]] && exit 1
+
+D1=$(head -1 "$1" | cut -c -16)
+
+[[ -z "$D1" ]] && die "@ 00:00 hs"
+
+VALID_DATE=$(echo "$D1" | egrep -o "[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}")
+
+[[ -z "$VALID_DATE" ]] && exit 1
+[[ "$D1" != "$VALID_DATE" ]] && exit 1
+
+E1=$(date --date="$D1" +%s)
+E2=$(date --date='now' +%s)
+EE=$((E2-E1))
+HM=$(date -d "1970-01-01 $EE seconds" +%H:%M)
+echo "@ $HM hs"

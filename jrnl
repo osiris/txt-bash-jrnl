@@ -1,0 +1,558 @@
+#!/bin/bash
+
+# This script comes with ABSOLUTELY NO WARRANTY, use at own risk
+# Copyright (C) 2017 Osiris Alejandro Gomez <osiux@osiux.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+DEFAULT_JRNL_DIR="$HOME/.jrnl"
+DEFAULT_JRNL_LOCAL_DIR="$PWD/.jrnl"
+
+JEXT='txt'
+
+RED=$(tput setaf 1)
+GREEN=$(tput setaf 2)
+YELLOW=$(tput setaf 3)
+BLUE=$(tput setaf 4)
+WHITE=$(tput setaf 7)
+BRIGHT=$(tput bold)
+NORMAL=$(tput sgr0)
+
+die ()
+{
+  printf "%s" "$RED[ERROR] $1 $NORMAL" && exit 1
+}
+
+success ()
+{
+  printf "%s" "$GREEN[OK] $1 $NORMAL" && exit 0
+}
+
+yesno ()
+{
+  [[ -t 0 ]] || return 0
+  local RESPONSE
+  read -r -p "${YELLOW}$1 [y/N] ? " RESPONSE
+  [[ "$RESPONSE" == [yY] ]] || success "bye!"
+}
+
+hours ()
+{
+  local h
+  [[ -z "$1" ]] && die
+  ((h=${1}/3600))
+  printf "%02d" $h
+}
+
+minutes ()
+{
+  local m
+  [[ -z "$1" ]] && die
+  ((m=(${1}%3600)/60))
+  printf "%02d" $m
+}
+
+get_hash ()
+{
+  local FILE
+  local HASH
+
+  [[ ! -z "$1" ]] && FILE="$1"
+  HASH=$(sha256sum "$FILE" | cut -c -6)
+  echo "$HASH"
+}
+
+jrnl_mkdir ()
+{
+  yesno "create $JRNL_DIR" && mkdir "$JRNL_DIR"
+}
+
+jrnl_get_file_by_index ()
+{
+
+  local DIR
+  local FILE
+  local HASH
+
+  DIR="$JRNL_DIR"
+  [[ ! -z "$1" ]] && HASH="$1"
+
+  find "$DIR" -type f -iname "*.$JEXT" | while read -r FILE
+  do
+    SHA=$(get_hash "$FILE")
+
+    if [[ "$SHA" = "$HASH" ]]
+    then
+      echo "$FILE"
+      exit 0
+    fi
+  done
+
+}
+
+jrnl_get_last_file ()
+{
+  local DIR
+  local FILE
+
+  if [[ ! -z "$1" ]]
+  then
+    DIR="$1"
+  else
+    DIR="$JRNL_DIR"
+  fi
+
+  [[ ! -d "$DIR" ]] && die "[get_last_file] not found directory: $DIR"
+
+  F=$(find "$DIR" -type f -iname "*.$JEXT" | sort -nr | sed 's/^.\///g' | head -1)
+
+  [[ -z "$F" ]] && die "[get_last_file] not found last file in: $DIR"
+
+  echo "$F"
+}
+
+jrnl_edit ()
+{
+  local DIR
+  local FILE
+  local F
+
+  if [[ -z "$1" ]]
+  then
+    DIR="$JRNL_DIR/$JRNL_TODAY"
+    FILE=$(jrnl_get_last_file "$DIR")
+  else
+    FILE=$(jrnl_get_file_by_index "$1")
+  fi
+
+  [[ ! -e "$FILE" ]] && die "[edit] not found file: $FILE"
+
+  vim -c 'set et' -c '$' -c 'normal A' -c 'startinsert' -c 'put .' "$FILE"
+
+  success "$FILE"
+}
+
+jrnl_copy ()
+{
+  local DIR
+  local FILE
+  local F
+  local OLD_FILE
+  local NEW_FILE
+
+  if [[ -z "$1" ]]
+  then
+    DIR="$JRNL_DIR/$JRNL_TODAY"
+    OLD_FILE=$(jrnl_get_last_file "$DIR")
+  else
+    OLD_FILE=$(jrnl_get_file_by_index "$1")
+  fi
+
+  [[ ! -e "$OLD_FILE" ]] && die "[copy] not found file: $OLD_FILE"
+
+  TITLE=$(head -1 "$OLD_FILE" | cut -c 17-)
+
+  NEW_FILE="$JRNL_DIR/$JRNL_TODAY/$JRNL_FILE"
+
+  jrnl_set_header_file "$NEW_FILE" "$TITLE"
+  tail -n +2 "$OLD_FILE" >> "$NEW_FILE"
+
+  vim -c 'set et' -c '$' -c 'normal A' -c 'startinsert' -c 'put .' "$NEW_FILE"
+}
+
+jrnl_view ()
+{
+  local DIR
+  local FILE
+  local F
+
+  if [[ -z "$1" ]]
+  then
+    DIR="$JRNL_DIR/$JRNL_TODAY"
+    FILE=$(jrnl_get_last_file "$DIR")
+  else
+    FILE=$(jrnl_get_file_by_index "$1")
+  fi
+
+  [[ ! -e "$FILE" ]] && die "[view] not found file: $FILE"
+
+  cat "$FILE"
+}
+
+jrnl_set_time ()
+{
+  local DIR
+  local FILE
+  local F
+  local T
+
+  if [[ -z "$1" ]]
+  then
+    DIR="$JRNL_DIR/$JRNL_TODAY"
+    FILE=$(jrnl_get_last_file "$DIR")
+  else
+    FILE=$(jrnl_get_file_by_index "$1")
+  fi
+
+  [[ ! -e "$FILE" ]] && die "[view] not found file: $FILE"
+
+  T=$(jrnl_get_foot_time "$FILE")
+
+  [[ "$T" != "00:00" ]] && die "[set_time] already time: $T"
+
+  if [[ -z "$2" ]]
+  then
+    T=$(jrnltimediff "$FILE" | awk '{print $2}')
+  else
+    T="$2"
+    VALID_TIME=$(echo "$T" | egrep -o "[0-9]{2}:[0-9]{2}")
+    [[ "$VALID_TIME" != "$T" ]] && die "[set_Time] invalid time: $T"
+  fi
+
+  printf "\n  @ %s hs\n" "$T" >> "$FILE"
+  success "[set_time] set time: $T in file: $FILE"
+}
+
+jrnl_delete ()
+{
+  local DIR
+  local FILE
+  local F
+
+  if [[ -z "$1" ]]
+  then
+    DIR="$JRNL_DIR/$JRNL_TODAY"
+    FILE=$(jrnl_get_last_file "$DIR")
+  else
+    FILE=$(jrnl_get_file_by_index "$1")
+  fi
+
+  [[ ! -e "$FILE" ]] && die "[delete] not found file: $FILE"
+
+  rm -i "$FILE"
+}
+
+jrnl_diff ()
+{
+  local DIR
+  local FILE_A
+  local FILE_B
+  local F
+
+  if [[ -z "$1" ]]
+  then
+    DIR="$JRNL_DIR/$JRNL_TODAY"
+    FILE_A=$(jrnl_get_last_file "$DIR")
+  else
+    FILE_A=$(jrnl_get_file_by_index "$1")
+  fi
+
+  if [[ -z "$2" ]]
+  then
+    DIR="$JRNL_DIR/$JRNL_TODAY"
+    FILE_A=$(jrnl_get_last_file "$DIR")
+    FILE_B=$(jrnl_get_file_by_index "$1")
+  else
+    FILE_B=$(jrnl_get_file_by_index "$2")
+  fi
+
+  [[ ! -e "$FILE_A" ]] && die "[diff] not found file: $FILE_A"
+  [[ ! -e "$FILE_B" ]] && die "[diff] not found file: $FILE_B"
+
+  vimdiff "$FILE_A" "$FILE_B"
+}
+
+jrnl_get_head_timestamp ()
+{
+  local HEAD_TIMESTAMP
+
+  [[ -z "$1" ]] && die "[get_head_timestamp] empty file"
+
+  HEAD_TIMESTAMP=$(head -1 "$1" | cut -c -16)
+  [[ -z "$HEAD_TIMESTAMP" ]] && die "[get_head_timestamp] empty timestamp in $1"
+
+  echo "$HEAD_TIMESTAMP"
+}
+
+jrnl_get_head_time ()
+{
+  local HEAD_TIME
+
+  [[ -z "$1" ]] && die "[get_head_time] empty file"
+
+  HEAD_TIME=$(head -1 "$1" | cut -c 12-16)
+  [[ -z "$HEAD_TIME" ]] && HEAD_TIME="00:00"
+
+  echo "$HEAD_TIME"
+}
+
+jrnl_get_foot_time ()
+{
+  local FOOT_TIME
+
+  [[ -z "$1" ]] && die "[get_foot_time] empty file"
+
+  FOOT_TIME=$(tail "$1" | egrep -o "@ [0-9]{2}:[0-9]{2} hs" | egrep -o "[0-9:]+")
+  [[ -z "$FOOT_TIME" ]] && FOOT_TIME="00:00"
+
+  echo "$FOOT_TIME"
+}
+
+jrnl_list ()
+{
+  local REGEXP
+  local LIST_DIR
+
+  REGEXP=''
+
+  [[ -z "$1" ]] && die
+  [[ ! -z "$2" ]] && REGEXP="$2"
+
+  LIST_DIR="$1"
+  LIST=$(mktemp)
+  DAYS=$(mktemp)
+  LIST_DAY=$(mktemp)
+
+  [[ ! -d "$LIST_DIR" ]] && die "[list] not found directory: $1"
+
+  printf "%s" "$NORMAL"
+
+  cd "$LIST_DIR" && find -type f -name "*.$JEXT" \
+    | cut -c 3-                                  \
+    | sort                                       \
+    | cat -n > "$LIST"
+
+    TOTAL_FOOT_SECONDS=0
+
+    while read -r _ f
+    do
+
+      FILE="$f"
+
+      if [[ ! -z "$REGEXP" ]]
+      then
+        egrep "$REGEXP" "$FILE" >/dev/null || continue
+      fi
+
+      FOOT_TIME=$(jrnl_get_foot_time "$FILE")
+      C_FOOT_TIME="${YELLOW}${FOOT_TIME}${NORMAL}"
+
+      HEAD=$(head -1 "$FILE")
+      HEAD_TIME=$(jrnl_get_head_time "$FILE")
+      C_HEAD_TIME="${GREEN}${HEAD_TIME}${NORMAL}"
+
+      MAX_COLS=$(tput cols);
+      COLS=$(( MAX_COLS - 30 ))
+
+      HEAD_TITLE=$(echo "$HEAD" \
+        | cut -c 18- \
+        | sed -e "s/ \`\`\([a-z.\-]\+\)\`\`/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
+        | sed -e "s/ \`\([a-z.\-]\+\)\`/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
+        | sed -e "s/ @\([a-z.\-]\+\)@/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
+        | sed -e "s/ =\([a-z.\-]\+\)=/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
+        | sed -e "s/ \*\([a-z.\-]\+\)\*/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
+        | sed -e "s/ \([0-9\-]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
+        | sed -e "s/ \([a-z0-9\-]\+\.[a-z0-9]\+\.[a-z0-9]\+\.[a-z]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
+        | sed -e "s/ \([a-z0-9\-]\+\.[a-z0-9]\+\.[a-z]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
+        | sed -e "s/ \([a-z0-9\-]\+\.[a-z0-9]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
+        | sed -e "s/ \([a-z0-9\-\.]\+@[a-z0-9\-]\+\.[a-z0-9]\+\.[a-z]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
+        | sed -e "s/ \([a-z0-9\-\.]\+@[a-z0-9\-]\+\.[a-z]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
+        | sed -e "s/ \([a-z]\+\-[a-z]\+\-[a-z0-9]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
+        | sed -e "s/ MX /${BRIGHT} MX ${NORMAL}${YELLOW}/g" \
+        | sed -e "s/ NS /${BRIGHT} NS ${NORMAL}${YELLOW}/g" \
+        | sed -e "s/ PTR /${BRIGHT} PTR ${NORMAL}${YELLOW}/g" \
+        | sed -e "s/ CNAME /${BRIGHT} CNAME ${NORMAL}${YELLOW}/g" \
+        | sed -e "s/ A /${BRIGHT} A ${NORMAL}${YELLOW}/g" \
+        | sed -e 's/ :(/ 🙁/g'
+      )
+
+      TITLE=$(echo "$HEAD_TITLE"| cut -c -$COLS)
+
+      [[ "${#HEAD_TITLE}" -gt "$COLS" ]] && TITLE="${TITLE}..."
+
+      HEAD_SECONDS=$(date -u '+%s' -d "1970-01-01 $HEAD_TIME" )
+      FOOT_SECONDS=$(date -u '+%s' -d "1970-01-01 $FOOT_TIME" )
+      TOTAL_FOOT_SECONDS=$(( TOTAL_FOOT_SECONDS + FOOT_SECONDS ))
+      END_EPOC=$(( HEAD_SECONDS + FOOT_SECONDS ))
+
+      END_TIME=$(date -u '+%H:%M' -d "@$END_EPOC" )
+      C_END_TIME="${RED}${END_TIME}${NORMAL}"
+
+      ISSUE_ID=$(echo "$HEAD" | egrep -wo "#[0-9]+")
+
+      if [[ -z "$ISSUE_ID" ]]
+      then
+        C_TITLE="${YELLOW}${TITLE}${WHITE}"
+      else
+        LI=${#ISSUE_ID}
+        LT=$((LI+1))
+        TITLE=$(echo "$TITLE" | cut -c $LT-)
+        C_TITLE="${BLUE}${ISSUE_ID}${YELLOW}${TITLE}${NORMAL}"
+      fi
+
+      HASH=$(get_hash "$FILE")
+
+      printf "%6s @ %5s %5s %5s %s\n" "$HASH" "$C_FOOT_TIME" "$C_HEAD_TIME" "$C_END_TIME" "$C_TITLE"
+    done < "$LIST"
+
+    echo
+    TOTAL_END_TIME=$(date -u '+%H:%M' -d "@$TOTAL_FOOT_SECONDS" )
+    printf "%6s @ %5s\n" " " "$TOTAL_END_TIME"
+
+  rm -f "$LIST"
+  rm -f "$DAYS"
+  rm -f "$LIST_DAY"
+}
+
+jrnl_set_header_file ()
+{
+  local FILE
+  local TITLE
+
+  [[ -z "$1" ]] && die "[new] empty filename"
+
+  TITLE=''
+  FILE="$1"
+
+  [[ ! -z "$2" ]] && TITLE="$2"
+  [[ ! -e "$FILE" ]] && echo "$TIMESTAMP $TITLE" > "$FILE"
+}
+
+jrnl_new ()
+{
+  local FILE
+
+  [[ -z "$1" ]] && die "[new] empty filename"
+  FILE="$1"
+
+  mkdir -p "$DIR"
+
+  jrnl_set_header_file "$FILE"
+
+  vim -c 'set et' -c '$' -c 'normal A' -c 'startinsert' -c 'put .' "$FILE"
+
+  success "$FILE"
+}
+
+jrnl_get_dates ()
+{
+  local TMP
+
+  TMP=$(mktemp)
+  date '+%Y %m %d %H %M %S' > "$TMP"
+
+  while read -r YY mm dd HH MM SS
+  do
+    YEAR="$YY"
+    TODAY="$YY-$mm-$dd"
+    NOW="$HH:$MM"
+    MONTH="$mm"
+    JRNL_FILE="${HH}${MM}${SS}.$JEXT"
+    TIMESTAMP="$TODAY $NOW"
+  done < "$TMP"
+
+  rm -f "$TMP"
+
+  JRNL_TODAY="$YEAR/$YEAR-$MONTH/$TODAY"
+  YESTERDAY=$(date --date="yesterday" +%Y-%m-%d)
+  JRNL_YESTERDAY="$YEAR/$YEAR-$MONTH/$YESTERDAY"
+}
+
+jrnl_view_last_files ()
+{
+  local F
+  local N
+  local T
+  local TMP
+
+  TMP=$(mktemp)
+  N=$(echo "$1" | egrep -o "[0-9]+")
+  [[ -z "$N" ]] && N=10
+
+  LAST_DIR=$(cd "$JRNL_DIR" && find -type d -iname "$YEAR" | grep "/$YEAR*" | sort -nr | head -1 | cut -c 3-)
+  DIR="$JRNL_DIR/$LAST_DIR"
+
+  find "$DIR" -type f -name "*.$JEXT" \
+    | head -"$N"                      \
+    | while read -r F
+  do
+    T=$(jrnl_get_head_timestamp "$F")
+    echo "$T $F"
+  done | sort -nr > "$TMP"
+
+  while read -r _ _ F
+  do
+    cat "$F"
+    printf "\n"
+  done < "$TMP"
+
+  rm -f "$TMP"
+}
+
+if [[ -z "$JRNL_DIR" ]]
+then
+
+  if [[ ! -d "$DEFAULT_JRNL_LOCAL_DIR" ]]
+  then
+    JRNL_DIR="$DEFAULT_JRNL_DIR"
+  else
+    JRNL_DIR="$DEFAULT_JRNL_LOCAL_DIR"
+  fi
+
+fi
+
+[[ ! -d "$JRNL_DIR" ]] && jrnl_mkdir
+
+jrnl_get_dates
+
+DIR="$JRNL_DIR/$JRNL_TODAY"
+[[ ! -d "$DIR" ]] && mkdir -p "$DIR"
+
+[[ -z "$1" ]] && jrnl_new "$DIR/$JRNL_FILE"
+
+case "$1" in
+  a|all)
+    jrnl_list "$JRNL_DIR" "$2"
+    ;;
+  c|copy)
+    jrnl_copy "$2"
+    ;;
+  d|diff)
+    jrnl_diff "$2" "$3"
+    ;;
+  e|edit)
+    jrnl_edit "$2"
+    ;;
+  l|ls|today)
+    jrnl_list "$DIR" "$2"
+    ;;
+  rm|remove|del|delete)
+    jrnl_delete "$2"
+    ;;
+  t|time)
+    jrnl_set_time "$2"
+    ;;
+  v|view)
+    jrnl_view "$2"
+    ;;
+  x|fix)
+    jrnltimestampfix "$JRNL_DIR"
+    ;;
+  y|yesterday)
+    DIR="$JRNL_DIR/$JRNL_YESTERDAY"
+    jrnl_list "$DIR" "$2"
+    ;;
+  *)
+    jrnl_view_last_files "$1"
+esac

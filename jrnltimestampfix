@@ -1,0 +1,44 @@
+#!/bin/bash
+
+# This script comes with ABSOLUTELY NO WARRANTY, use at own risk
+# Copyright (C) 2017 Osiris Alejandro Gómez <osiux@osiux.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+DIR="$PWD/.jrnl"
+
+[[ ! -z "$1" ]] && DIR="$1"
+[[ ! -d "$DIR" ]] && exit 1
+
+find "$DIR" -type f -iname '*.txt' | while read F
+do
+
+  D=$(dirname "$F")
+  FILE=$(basename "$F")
+  
+  SS=$(echo "$FILE" | egrep -o "[0-9]+" | cut -c 5-6)
+  [[ -z "$SS" ]] && SS='00'
+  [[ "$SS" = "0" ]] && SS='00'
+
+  HEAD_TIME=$(head -1 "$F" | cut -c 12-16 | egrep -o "[0-9]{2}:[0-9]{2}")
+  HM=$(echo "$HEAD_TIME" | tr -d ':')
+
+  NEW_FILE=$(printf "%6s.txt" "$HM$SS")
+
+  [[ "$FILE" = "$NEW_FILE" ]] && continue
+
+  mv -vi "$F" "$D/$NEW_FILE"
+
+done
+

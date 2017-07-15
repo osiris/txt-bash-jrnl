@@ -2,6 +2,12 @@
 
 A simple command line journal application that stores your journal in a plain text file, developed in *bash* and inspired in [jrnl.sh](http://jrnl.sh)
 
+## Install
+
+```
+# sudo make install
+```
+
 ## License
 
 -  all software licensed under the terms of the GNU General Public License:

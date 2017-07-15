@@ -1,1 +1,2 @@
 x 2017-07-15 create a public repo txt-bash-jrnl +jrnl @github
+x 2017-07-15 minimal refactor of jrnl before publish
