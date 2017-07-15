@@ -1,0 +1,34 @@
+2017-07-15 11:19 create repo in *github* and initialize local repo with minimal `README.md`, add *jrnl* directory, `todo.txt` files and `.gitignore`
+
+  # cd ~/git/osiris/txt-bash-jrnl
+
+  # git init
+
+  # git remote add origin github:osiris/txt-bash-jrnl
+
+  # git fetch
+  remote: Counting objects: 4, done.
+  remote: Compressing objects: 100% (4/4), done.
+  remote: Total 4 (delta 0), reused 0 (delta 0), pack-reused 0
+  Unpacking objects: 100% (4/4), done.
+  From github:osiris/txt-bash-jrnl
+   * [new branch]      master     -> origin/master
+
+  # git branch --set-upstream-to=origin/master master
+
+  # gpl origin master
+  From github:osiris/txt-bash-jrnl
+   * branch            master     -> FETCH_HEAD
+
+  # git branch --set-upstream-to=origin/master master
+  Branch master set up to track remote branch master from origin by rebasing.
+
+  # todo.sh do 1
+  1 x 2017-07-15 create a public repo txt-bash-jrnl +jrnl @github
+  TODO: 1 marked as done.
+  x 2017-07-15 create a public repo txt-bash-jrnl +jrnl @github
+  TODO: /home/osiris/git/osiris/txt-bash-jrnl/todo.txt archived.
+
+  # git add todo.xt done.txt report.txt
+
+  @ 00:34 hs
