@@ -493,11 +493,9 @@ jrnl_view_last_files ()
   N=$(echo "$1" | egrep -o "[0-9]+")
   [[ -z "$N" ]] && N=10
 
-  LAST_DIR=$(cd "$JRNL_DIR" && find -type d -iname "$YEAR" | grep "/$YEAR*" | sort -nr | head -1 | cut -c 3-)
-  DIR="$JRNL_DIR/$LAST_DIR"
-
-  find "$DIR" -type f -name "*.$JEXT" \
-    | head -"$N"                      \
+  find "$JRNL_DIR/$YEAR" -type f -iname "*.$JEXT" \
+    | sort -nr                                    \
+    | head -"$N"                                  \
     | while read -r F
   do
     T=$(jrnl_get_head_timestamp "$F")
