@@ -156,6 +156,148 @@ jrnl_edit ()
   success "$FILE"
 }
 
+jrnl_short_help ()
+{
+cat << EOF
+
+Usage: $(basename $0) [action] [hash]
+
+  # jrnl                    Create a journal
+  # jrnl 1                  View the last journals
+  # jrnl 5                  View the last five journals
+
+Actions:
+
+  a|all [PATTERN]           List all journals, optionally filter by
+                            PATTERN or REGEX
+
+  c|copy [HASH]             Copy journal by HASH
+
+  d|diff HASH1 [HASH2]      View differences between journals
+
+  -h|--help                 Show short or full help
+
+  l|ls|today                List today journals
+
+  rm|remove|del|delete HASH Delete a journal specified by hash or by
+                            default the last journal
+
+  t|time [HH:MM]            Set specified time in HH:MM format or by
+                            default with difference between current time
+                            and header timestamp of journal
+
+  -v|--version              Show version and credits
+
+  v|view [HASH]             View a journal specified by hash or by
+                            default the last journal
+
+  x|fix                     Set filename of journal with timestamp of
+                            journal header
+
+  y|yesterday               List yesterday journals
+
+EOF
+}
+
+jrnl_full_help ()
+{
+cat << EOF
+
+Usage: $(basename $0) [action] [hash]
+
+Create a journal:
+
+  # jrnl
+
+View the last N journals:
+
+  # jrnl 1
+  # jrnl 5
+
+Actions:
+
+  a|all [PATTERN]
+
+    List all journals, optionally filter by PATTERN or REGEX
+
+    # jrnl a
+    # jrnl a 2017
+    # jrnl a github
+    # jrnl a "#[0-9]+"
+
+  c|copy [HASH]
+
+    Copy journal by HASH
+
+    # jrnl c ha4s5h
+
+  d|diff HASH1 [HASH2]
+
+    View differences between journals.
+    By default HASH2 is the last journal
+
+    # jrnl d ha4sh1 ha4sh2
+    # jrnl d ha4sh1
+
+  e|edit [HASH]
+
+    Edit last journal or specified journal
+
+    # jrnl e
+    # jrnl e ha4s5h
+
+  -h|--help
+
+    Show short or full help
+
+    # jrnl -h
+    # jrnl --help
+
+  l|ls|today
+
+    List today journals
+
+    # jrnl l
+
+  rm|remove|del|delete HASH
+
+    Delete a journal specified by hash or by default the last journal
+
+    # jrnl d ha4s5h
+
+  t|time [HH:MM]
+
+    Set specified time in HH:MM format or by default with difference
+    between current time and header timestamp of journal
+
+    # jrnl t 00:25
+    # jrnl t
+
+  -v|--version
+
+    Show version and credits
+
+  v|view [HASH]
+
+    View a journal specified by hash or by default the last journal
+
+    # jrnl v ha4s5h
+
+  x|fix
+
+    Set filename of journal with timestamp of journal header
+
+    # jrnl x
+
+  y|yesterday
+
+    List yesterday journals
+
+    # jrnl y
+
+EOF
+}
+
 jrnl_copy ()
 {
   local DIR
@@ -182,6 +324,26 @@ jrnl_copy ()
   tail -n +2 "$OLD_FILE" >> "$NEW_FILE"
 
   vim -c 'set et' -c '$' -c 'normal A' -c 'startinsert' -c 'put .' "$NEW_FILE"
+}
+
+jrnl_version ()
+{
+cat << EOF
+
+  jrnl
+
+  A simple command line journal application that stores your journal
+  in a plain text file, developed in bash and inspired in jrnl.sh
+  http://jrnl.sh
+
+  Author: Osiris Alejandro Gómez https://www.osiux.com/,
+  worker cooperative of gcoop Cooperativa de Software Libre
+  https://www.gcoop.coop/
+
+  License: GPL, https://www.gnu.org/copyleft/gpl.html
+  Code: https://github.com/osiris/txt-bash-jrnl
+
+EOF
 }
 
 jrnl_view ()
@@ -545,6 +707,12 @@ case "$1" in
   e|edit)
     jrnl_edit "$2"
     ;;
+  -h)
+    jrnl_short_help
+    ;;
+  --help)
+    jrnl_full_help
+    ;;
   l|ls|today)
     jrnl_list "$DIR" "$2"
     ;;
@@ -556,6 +724,9 @@ case "$1" in
     ;;
   v|view)
     jrnl_view "$2"
+    ;;
+  -v|--version)
+    jrnl_version
     ;;
   x|fix)
     jrnltimestampfix "$JRNL_DIR"
