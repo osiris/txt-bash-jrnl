@@ -607,15 +607,21 @@ jrnl_set_header_file ()
 jrnl_new ()
 {
   local FILE
+  local TEXT
 
   [[ -z "$1" ]] && die "[new] empty filename"
   FILE="$1"
 
   mkdir -p "$DIR"
 
-  jrnl_set_header_file "$FILE"
-
-  vim -c 'set et' -c '$' -c 'normal A' -c 'startinsert' -c 'put .' "$FILE"
+  if [[ -z "$2" ]]
+  then
+    jrnl_set_header_file "$FILE"
+    vim -c 'set et' -c '$' -c 'normal A' -c 'startinsert' -c 'put .' "$FILE"
+  else
+    TEXT=$(echo "$2" | sed 's/^n //g' | sed 's/^new //g')
+    echo "$TIMESTAMP $TEXT" > "$FILE"
+  fi
 
   success "$FILE"
 }
@@ -715,6 +721,10 @@ case "$1" in
     ;;
   l|ls|today)
     jrnl_list "$DIR" "$2"
+    ;;
+  n|new)
+    echo "$@"
+    jrnl_new "$DIR/$JRNL_FILE" "$*"
     ;;
   rm|remove|del|delete)
     jrnl_delete "$2"
