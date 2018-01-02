@@ -1,0 +1,3 @@
+2017-07-26 15:40 allow create new journal from STDIN or PIPE
+
+  @ 01:11 hs

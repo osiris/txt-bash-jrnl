@@ -1,0 +1,3 @@
+2017-07-26 18:31 replace hash of content file with hash of filename
+
+  @ 00:03 hs

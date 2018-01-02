@@ -1,0 +1,3 @@
+2017-10-05 00:47 set duration time of last journal when create new journal
+
+  @ 00:13 hs

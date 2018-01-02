@@ -1,0 +1,64 @@
+#!/bin/bash
+
+# This script comes with ABSOLUTELY NO WARRANTY, use at own risk
+# Copyright (C) 2017 Osiris Alejandro Gomez <osiux@osiux.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+declare -a A B C D E F
+
+HOURS=$(mktemp)
+TMP=$(mktemp)
+BAR=$(mktemp)
+
+[[ -z "$1" ]] && exit 1
+[[ ! -e "$1" ]] && exit 1
+
+awk '{print $1}' "$1" | sort -u > "$HOURS"
+
+while read -r H
+do
+
+  HOUR=$(echo "$H" | sed 's/^0//g')
+
+  grep "^$H" "$1"    \
+    | sed 's/□/0 /g' \
+    | sed 's/▨/1 /g' \
+    | sed 's/▣/2 /g' > "$TMP"
+
+  while read -r _ a b c d e f
+  do
+    A[$HOUR]=$(( A[HOUR] + a ))
+    B[$HOUR]=$(( B[HOUR] + b ))
+    C[$HOUR]=$(( C[HOUR] + c ))
+    D[$HOUR]=$(( D[HOUR] + d ))
+    E[$HOUR]=$(( E[HOUR] + e ))
+    F[$HOUR]=$(( F[HOUR] + f ))
+    [[ "${A[$HOUR]}" -gt 2 ]] && A[$HOUR]=2
+    [[ "${B[$HOUR]}" -gt 2 ]] && B[$HOUR]=2
+    [[ "${C[$HOUR]}" -gt 2 ]] && C[$HOUR]=2
+    [[ "${D[$HOUR]}" -gt 2 ]] && D[$HOUR]=2
+    [[ "${E[$HOUR]}" -gt 2 ]] && E[$HOUR]=2
+    [[ "${F[$HOUR]}" -gt 2 ]] && F[$HOUR]=2
+  done < "$TMP"
+
+  echo "$HOUR" "${A[$HOUR]}" "${B[$HOUR]}" "${C[$HOUR]}" "${D[$HOUR]}" "${E[$HOUR]}" "${F[$HOUR]}"
+
+done < "$HOURS" > "$BAR"
+
+while read -r H T
+do
+  printf "%2d %s" "$H" "$(echo -n "$T" | sed 's/0/□/g' | sed 's/1/▨/g' | sed 's/2/▣/g' | tr -d ' ') "
+done < "$BAR"
+

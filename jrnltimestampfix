@@ -16,29 +16,93 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-DIR="$PWD/.jrnl"
+DEFAULT_JRNL_DIR="$HOME/.jrnl"
+DEFAULT_JRNL_LOCAL_DIR="$PWD/.jrnl"
+
+die ()
+{
+  printf "%s" "$RED[ERROR] $1 $NORMAL" && exit 1
+}
+
+if tput setaf 1 &> /dev/null
+then
+  NORMAL=$(tput sgr0);
+  BRIGHT=$(tput bold);
+  BLUE=$(tput setaf 33);
+  GREEN=$(tput setaf 46);
+  RED=$(tput setaf 196);
+  WHITE=$(tput setaf 231);
+  YELLOW=$(tput setaf 11);
+else
+  NORMAL="\e[0m";
+  BRIGHT="\e[1m";
+  BLUE="\e[1;34m";
+  GREEN="\e[1;32m";
+  RED="\e[1;31m";
+  WHITE="\e[1;37m";
+  YELLOW="\e[1;33m";
+fi;
+
+TMP=$(mktemp)
+date '+%Y %m %d %H %M %S' > "$TMP"
+
+while read -r YY mm dd HH MM SS
+do
+  YEAR="$YY"
+  TODAY="$YY-$mm-$dd"
+  NOW="$HH:$MM"
+  MONTH="$mm"
+done < "$TMP"
+
+if [[ -z "$JRNL_DIR" ]]
+then
+
+  if [[ ! -d "$DEFAULT_JRNL_LOCAL_DIR" ]]
+  then
+    JRNL_DIR="$DEFAULT_JRNL_DIR"
+  else
+    JRNL_DIR="$DEFAULT_JRNL_LOCAL_DIR"
+  fi
+
+fi
+##JRNL_DIR="$HOME/.jrnl"
+
+DIR="$JRNL_DIR/$YEAR/$YEAR-$MONTH/$TODAY"
 
 [[ ! -z "$1" ]] && DIR="$1"
-[[ ! -d "$DIR" ]] && exit 1
+[[ ! -d $(realpath "$DIR") ]] && die "invalid directory: $DIR"
 
-find "$DIR" -type f -iname '*.txt' | while read F
+find "$DIR" -follow -type f -iname '*.txt' | while read F
 do
 
   D=$(dirname "$F")
   FILE=$(basename "$F")
-  
+
   SS=$(echo "$FILE" | egrep -o "[0-9]+" | cut -c 5-6)
   [[ -z "$SS" ]] && SS='00'
   [[ "$SS" = "0" ]] && SS='00'
 
-  HEAD_TIME=$(head -1 "$F" | cut -c 12-16 | egrep -o "[0-9]{2}:[0-9]{2}")
+  HEAD=$(head -1 "$F")
+  HEAD_DATE=$(echo "$HEAD" | cut -c -10 | egrep -o "[0-9]{4}-[0-9]{2}-[0-9]{2}")
+  HEAD_TIME=$(echo "$HEAD" | cut -c 12-16 | egrep -o "[0-9]{2}:[0-9]{2}")
   HM=$(echo "$HEAD_TIME" | tr -d ':')
+  YY=$(echo "$HEAD_DATE" | cut -d '-' -f1)
+  MM=$(echo "$HEAD_DATE" | cut -d '-' -f2)
 
+  [[ -z "$HEAD_DATE" ]] && die "invalid DATE: $HEAD_DATE in: $F"
+  [[ -z "$HM"        ]] && die "invalid HOUR: $HM in: $F"
+  [[ -z "$YY"        ]] && die "invalid YEAR: $YY in: $F"
+  [[ -z "$MM"        ]] && die "invalid MONTH: $MM in: $F"
+
+  NEW_DIR="$JRNL_DIR/$YY/$YY-$MM/$HEAD_DATE"
   NEW_FILE=$(printf "%6s.txt" "$HM$SS")
 
-  [[ "$FILE" = "$NEW_FILE" ]] && continue
+  if [[ "$D" = "$NEW_DIR" ]]
+  then
+    [[ "$FILE" = "$NEW_FILE" ]] && continue
+  fi
 
-  mv -vi "$F" "$D/$NEW_FILE"
+  mv -vi "$F" "$NEW_DIR/$NEW_FILE"
 
 done
 

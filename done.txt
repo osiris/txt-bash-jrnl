@@ -1,2 +1,9 @@
 x 2017-07-15 create a public repo txt-bash-jrnl +jrnl @github
-x 2017-07-15 minimal refactor of jrnl before publish
+x 2017-07-15 minimal refactor of jrnl before publish +jrnl
+x 2017-07-22 add alternative for colors without tput +termux @jrnl
+x 2017-07-22 fix find last files +find
+x 2017-07-22 add help
+x 2017-07-24 add quick enter of journal from command line without edit in Vim
+x 2017-07-26 replace actual hash with hash of timestamp +time
+x 2017-10-05 set end time in last journal when create a new journal
+x 2017-10-05 List last week journals

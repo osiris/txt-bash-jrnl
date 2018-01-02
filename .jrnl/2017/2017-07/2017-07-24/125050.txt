@@ -1,0 +1,3 @@
+2017-07-24 12:50 add quick enter of journal from command line without edit in Vim
+
+  @ 00:37 hs

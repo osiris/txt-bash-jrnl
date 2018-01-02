@@ -24,10 +24,9 @@ JEXT='txt'
 # by https://github.com/mathiasbynens/dotfiles
 if tput setaf 1 &> /dev/null
 then
-  tput sgr0; # reset colors
   NORMAL=$(tput sgr0);
   BRIGHT=$(tput bold);
-  BLUE=$(tput setaf 27);
+  BLUE=$(tput setaf 33);
   GREEN=$(tput setaf 46);
   RED=$(tput setaf 196);
   WHITE=$(tput setaf 231);
@@ -82,7 +81,7 @@ get_hash ()
   local HASH
 
   [[ ! -z "$1" ]] && FILE="$1"
-  HASH=$(sha256sum "$FILE" | cut -c -6)
+  HASH=$(head -1 "$FILE" | cut -c -16 | sha256sum | cut -c -6)
   echo "$HASH"
 }
 
@@ -101,7 +100,7 @@ jrnl_get_file_by_index ()
   DIR="$JRNL_DIR"
   [[ ! -z "$1" ]] && HASH="$1"
 
-  find "$DIR" -type f -iname "*.$JEXT" | while read -r FILE
+  find "$DIR" -follow -type f -iname "*.$JEXT" | while read -r FILE
   do
     SHA=$(get_hash "$FILE")
 
@@ -128,7 +127,7 @@ jrnl_get_last_file ()
 
   [[ ! -d "$DIR" ]] && die "[get_last_file] not found directory: $DIR"
 
-  F=$(find "$DIR" -type f -iname "*.$JEXT" | sort -nr | sed 's/^.\///g' | head -1)
+  F=$(find "$DIR" -follow -type f -iname "*.$JEXT" | sort -nr | sed 's/^.\///g' | head -1)
 
   [[ -z "$F" ]] && die "[get_last_file] not found last file in: $DIR"
 
@@ -151,7 +150,7 @@ jrnl_edit ()
 
   [[ ! -e "$FILE" ]] && die "[edit] not found file: $FILE"
 
-  vim -c 'set et' -c '$' -c 'normal A' -c 'startinsert' -c 'put .' "$FILE"
+  vim -c 'set titlestring=jrnl' -c 'set et' -c '$' -c 'normal A' -c 'startinsert' -c 'put .' "$FILE"
 
   success "$FILE"
 }
@@ -160,7 +159,7 @@ jrnl_short_help ()
 {
 cat << EOF
 
-Usage: $(basename $0) [action] [hash]
+Usage: $(basename "$0") [action] [hash]
 
   # jrnl                    Create a journal
   # jrnl 1                  View the last journals
@@ -179,6 +178,9 @@ Actions:
 
   l|ls|today                List today journals
 
+  m|month [PATTERN]         List last month journals, optionally filter
+                            by PATTERN or REGEX
+
   rm|remove|del|delete HASH Delete a journal specified by hash or by
                             default the last journal
 
@@ -191,10 +193,15 @@ Actions:
   v|view [HASH]             View a journal specified by hash or by
                             default the last journal
 
+  w|week [PATTERN]          List last week journals, optionally filter
+                            by PATTERN or REGEX
+
   x|fix                     Set filename of journal with timestamp of
                             journal header
 
   y|yesterday               List yesterday journals
+
+  Y|year                    List last year journals
 
 EOF
 }
@@ -203,7 +210,7 @@ jrnl_full_help ()
 {
 cat << EOF
 
-Usage: $(basename $0) [action] [hash]
+Usage: $(basename "$0") [action] [hash]
 
 Create a journal:
 
@@ -295,6 +302,23 @@ Actions:
 
     # jrnl y
 
+  w|week
+
+    List last week journals
+
+    # jrnl w
+
+  m|month
+
+    List last month journals
+
+    # jrnl m
+
+  Y|year
+
+    List last year journals
+
+    # jrnl Y
 EOF
 }
 
@@ -316,7 +340,7 @@ jrnl_copy ()
 
   [[ ! -e "$OLD_FILE" ]] && die "[copy] not found file: $OLD_FILE"
 
-  TITLE=$(head -1 "$OLD_FILE" | cut -c 17-)
+  TITLE=$(head -1 "$OLD_FILE" | cut -c 16-)
 
   NEW_FILE="$JRNL_DIR/$JRNL_TODAY/$JRNL_FILE"
 
@@ -346,6 +370,25 @@ cat << EOF
 EOF
 }
 
+jrnl_file ()
+{
+  local DIR
+  local FILE
+  local F
+
+  if [[ -z "$1" ]]
+  then
+    DIR="$JRNL_DIR/$JRNL_TODAY"
+    FILE=$(jrnl_get_last_file "$DIR")
+  else
+    FILE=$(jrnl_get_file_by_index "$1")
+  fi
+
+  [[ ! -e "$FILE" ]] && die "[view] not found file: $FILE"
+
+  echo "$FILE"
+}
+
 jrnl_view ()
 {
   local DIR
@@ -365,12 +408,13 @@ jrnl_view ()
   cat "$FILE"
 }
 
-jrnl_set_time ()
+jrnl_set_start ()
 {
   local DIR
   local FILE
   local F
   local T
+  #local D
 
   if [[ -z "$1" ]]
   then
@@ -380,7 +424,69 @@ jrnl_set_time ()
     FILE=$(jrnl_get_file_by_index "$1")
   fi
 
-  [[ ! -e "$FILE" ]] && die "[view] not found file: $FILE"
+  [[ ! -e "$FILE" ]] && die "[set_start] not found file: $FILE"
+
+  #D=$(jrnl_get_head_date "$FILE")
+
+  if [[ -z "$2" ]]
+  then
+    T="$NOW"
+  else
+    T="$2"
+    VALID_TIME=$(echo "$T" | egrep -o "[0-9]{2}:[0-9]{2}")
+    [[ "$VALID_TIME" != "$T" ]] && die "[set_start] invalid time: $T"
+  fi
+
+  echo "FIXME jrnl_set_head_time" "$T" "$FILE"
+  success "[set_start] set time: $T in file: $FILE"
+}
+
+jrnl_set_time ()
+{
+  local DIR
+  local FILE
+  local F
+  local T
+
+  VALID_TIME=$(echo "$1" | egrep -o "[0-9]{2}:[0-9]{2}")
+  VALID_HASH=$(echo "$1" | egrep -o "[a-f0-9]{6}")
+
+  if [[ "$1" = "$VALID_TIME" ]]
+  then
+
+    if [[ -z "$2" ]]
+    then
+      DIR="$JRNL_DIR/$JRNL_TODAY"
+      FILE=$(jrnl_get_last_file "$DIR")
+    fi
+
+  else
+
+    if [[ "$1" = "$VALID_TIME" ]]
+    then
+      FILE=$(jrnl_get_file_by_index "$1")
+    fi
+
+    #if [[ "$1" = "$VALID_HASH" ]]
+    #then
+    #  FILE=$(jrnl_get_file_by_index "$1")
+    # die
+    #fi
+
+  fi
+
+  # FIXME
+  # $1 = 00:25 + $2 = null : get last file
+  # $1 = abcde + $2 = 00:25
+  if [[ -z "$1" ]]
+  then
+    DIR="$JRNL_DIR/$JRNL_TODAY"
+    FILE=$(jrnl_get_last_file "$DIR")
+  else
+    FILE=$(jrnl_get_file_by_index "$1")
+  fi
+
+  [[ ! -e "$FILE" ]] && die "[set_time] not found file: $FILE"
 
   T=$(jrnl_get_foot_time "$FILE")
 
@@ -415,6 +521,7 @@ jrnl_delete ()
 
   [[ ! -e "$FILE" ]] && die "[delete] not found file: $FILE"
 
+  head -1 "$FILE"
   rm -i "$FILE"
 }
 
@@ -460,6 +567,18 @@ jrnl_get_head_timestamp ()
   echo "$HEAD_TIMESTAMP"
 }
 
+jrnl_get_head_date ()
+{
+  local HEAD_DATE
+
+  [[ -z "$1" ]] && die "[get_head_date] empty file"
+
+  HEAD_DATE=$(head -1 "$1" | cut -c -11)
+  [[ -z "$HEAD_DATE" ]] && HEAD_DATE="1970-01-01"
+
+  echo "$HEAD_DATE"
+}
+
 jrnl_get_head_time ()
 {
   local HEAD_TIME
@@ -478,18 +597,93 @@ jrnl_get_foot_time ()
 
   [[ -z "$1" ]] && die "[get_foot_time] empty file"
 
-  FOOT_TIME=$(tail "$1" | egrep -o "@ [0-9]{2}:[0-9]{2} hs" | egrep -o "[0-9:]+")
+  FOOT_TIME=$(tail -1 "$1" | egrep -o "^  @ [0-9]{2}:[0-9]{2} hs$" | egrep -o "[0-9:]+")
   [[ -z "$FOOT_TIME" ]] && FOOT_TIME="00:00"
 
   echo "$FOOT_TIME"
+}
+
+jrnl_last_week ()
+{
+  local DIR
+  local DATE
+  local D
+  local M
+  local n
+  local t
+
+  [[ -z "$3" ]] && n=1
+  t=$((6*n))
+
+  for D in $(seq "$t" -1 0)
+  do
+    DATE=$(date --date="-$D days" +%Y-%m-%d)
+    M=$(echo "$DATE"| cut -d '-' -f2)
+    DIR="$JRNL_DIR/$YEAR/$YEAR-$M/$DATE"
+
+    [[ ! -d "$DIR" ]] && continue
+    jrnl_list "$DIR" "$2"
+  done
+}
+
+jrnl_last_month ()
+{
+  local D
+  local DATE
+  local DIR
+  local M
+  local n
+  local t
+
+  [[ -z "$3" ]] && n=1
+  t=$((30*n))
+
+  for D in $(seq "$t" -1 0)
+  do
+    DATE=$(date --date="-$D days" +%Y-%m-%d)
+    M=$(echo "$DATE"| cut -d '-' -f2)
+    DIR="$JRNL_DIR/$YEAR/$YEAR-$M/$DATE"
+
+    [[ ! -d "$DIR" ]] && continue
+    jrnl_list "$DIR" "$2"
+  done
+}
+
+jrnl_last_year ()
+{
+  local D
+  local DATE
+  local DIR
+  local M
+  local Y
+  local n
+  local t
+
+  [[ -z "$3" ]] && n=1
+  t=$((365*n))
+
+  for D in $(seq "$t" -1 0)
+  do
+    DATE=$(date --date="-$D days" +%Y-%m-%d)
+    Y=$(echo "$DATE"| cut -d '-' -f1)
+    M=$(echo "$DATE"| cut -d '-' -f2)
+    DIR="$JRNL_DIR/$Y/$Y-$M/$DATE"
+
+    [[ ! -d "$DIR" ]] && continue
+    jrnl_list "$DIR" "$2"
+  done
 }
 
 jrnl_list ()
 {
   local REGEXP
   local LIST_DIR
+  local BARDAY
 
   REGEXP=''
+  BARDAY=''
+
+  [[ -z $JRNL_DONT_SHOW_TIME ]] && JRNL_SHOW_TIME=1
 
   [[ -z "$1" ]] && die
   [[ ! -z "$2" ]] && REGEXP="$2"
@@ -503,16 +697,27 @@ jrnl_list ()
 
   printf "%s" "$NORMAL"
 
-  cd "$LIST_DIR" && find -type f -name "*.$JEXT" \
-    | cut -c 3-                                  \
-    | sort                                       \
-    | cat -n > "$LIST"
+  TOTAL_FOOT_SECONDS=0
+  TOTAL_FOOT_MINUTES=0
+  MAX_FOOT_MINUTES=0
 
-    TOTAL_FOOT_SECONDS=0
-
-    while read -r _ f
+  cd "$LIST_DIR" && find -follow -type f -name "*.$JEXT" \
+    | cut -c 3-                                          \
+    | sort                                               \
+    | while read -r f
     do
+      FOOT_TIME=$(jrnl_get_foot_time "$f")
+      FOOT_SECONDS=$(date -u '+%s' -d "1970-01-01 $FOOT_TIME")
+      FOOT_MINUTES=0
+      FOOT_MINUTES=$(echo "$FOOT_SECONDS" | awk '{printf "%0d",$1/60}')
+      TOTAL_FOOT_MINUTES=$(( TOTAL_FOOT_MINUTES + FOOT_MINUTES ))
+      printf "%3s %s\n" "$FOOT_MINUTES" "$f"
+    done > "$LIST"
 
+    BARDAY=$(mktemp)
+
+    while read -r m f
+    do
       FILE="$f"
 
       if [[ ! -z "$REGEXP" ]]
@@ -525,18 +730,23 @@ jrnl_list ()
 
       HEAD=$(head -1 "$FILE")
       HEAD_TIME=$(jrnl_get_head_time "$FILE")
+      HEAD_DATE=$(jrnl_get_head_date "$FILE")
       C_HEAD_TIME="${GREEN}${HEAD_TIME}${NORMAL}"
 
       MAX_COLS=$(tput cols);
-      COLS=$(( MAX_COLS - 30 ))
+      COLS=$(( MAX_COLS - 20 ))
 
       HEAD_TITLE=$(echo "$HEAD" \
-        | cut -c 18- \
+        | cut -c 18-$COLS       \
         | sed -e "s/ \`\`\([a-z.\-]\+\)\`\`/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
-        | sed -e "s/ \`\([a-z.\-]\+\)\`/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
+        | sed -e "s/ \`\([a-zA-Z.\-]\+\)\`/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
         | sed -e "s/ @\([a-z.\-]\+\)@/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
         | sed -e "s/ =\([a-z.\-]\+\)=/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
         | sed -e "s/ \*\([a-z.\-]\+\)\*/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
+        | sed -e "s/ \*\([a-z0-9.\s\-]\+\)\* / ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
+        | sed -e "s/ \(+[a-z]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
+        | sed -e "s/ \(\/[a-z0-9\.\/\-]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
+        | sed -e "s/ \(@[a-z]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
         | sed -e "s/ \([0-9\-]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
         | sed -e "s/ \([a-z0-9\-]\+\.[a-z0-9]\+\.[a-z0-9]\+\.[a-z]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
         | sed -e "s/ \([a-z0-9\-]\+\.[a-z0-9]\+\.[a-z]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
@@ -544,15 +754,16 @@ jrnl_list ()
         | sed -e "s/ \([a-z0-9\-\.]\+@[a-z0-9\-]\+\.[a-z0-9]\+\.[a-z]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
         | sed -e "s/ \([a-z0-9\-\.]\+@[a-z0-9\-]\+\.[a-z]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
         | sed -e "s/ \([a-z]\+\-[a-z]\+\-[a-z0-9]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
-        | sed -e "s/ MX /${BRIGHT} MX ${NORMAL}${YELLOW}/g" \
-        | sed -e "s/ NS /${BRIGHT} NS ${NORMAL}${YELLOW}/g" \
-        | sed -e "s/ PTR /${BRIGHT} PTR ${NORMAL}${YELLOW}/g" \
+        | sed -e "s/ MX /${BRIGHT} MX ${NORMAL}${YELLOW}/g"       \
+        | sed -e "s/ CSV /${BRIGHT} MX ${NORMAL}${YELLOW}/g"      \
+        | sed -e "s/ NS /${BRIGHT} NS ${NORMAL}${YELLOW}/g"       \
+        | sed -e "s/ PTR /${BRIGHT} PTR ${NORMAL}${YELLOW}/g"     \
         | sed -e "s/ CNAME /${BRIGHT} CNAME ${NORMAL}${YELLOW}/g" \
-        | sed -e "s/ A /${BRIGHT} A ${NORMAL}${YELLOW}/g" \
+        | sed -e "s/ A /${BRIGHT} A ${NORMAL}${YELLOW}/g"         \
         | sed -e 's/ :(/ 🙁/g'
       )
 
-      TITLE=$(echo "$HEAD_TITLE"| cut -c -$COLS)
+      TITLE="$HEAD_TITLE"
 
       [[ "${#HEAD_TITLE}" -gt "$COLS" ]] && TITLE="${TITLE}..."
 
@@ -564,7 +775,7 @@ jrnl_list ()
       END_TIME=$(date -u '+%H:%M' -d "@$END_EPOC" )
       C_END_TIME="${RED}${END_TIME}${NORMAL}"
 
-      ISSUE_ID=$(echo "$HEAD" | egrep -wo "#[0-9]+")
+      ISSUE_ID=$(echo "$HEAD" | egrep -wo "#[0-9]+" | head -1)
 
       if [[ -z "$ISSUE_ID" ]]
       then
@@ -575,15 +786,29 @@ jrnl_list ()
         TITLE=$(echo "$TITLE" | cut -c $LT-)
         C_TITLE="${BLUE}${ISSUE_ID}${YELLOW}${TITLE}${NORMAL}"
       fi
-
       HASH=$(get_hash "$FILE")
+      echo "$HASH" >> "$CACHE_HASH"
+      BAR=$(hour-timeline "$HEAD_TIME" "$END_TIME")
+      HEAD_HOUR=$(echo "$HEAD_TIME" | cut -d: -f1)
+      echo "$HEAD_HOUR $BAR" >> "$BARDAY"
 
-      printf "%6s @ %5s %5s %5s %s\n" "$HASH" "$C_FOOT_TIME" "$C_HEAD_TIME" "$C_END_TIME" "$C_TITLE"
+      if [[ $JRNL_SHOW_TIME -eq 1 ]]
+      then
+        printf "%6s %-10s %5s %5s %5s %s\n" "$HASH" "$BAR" "$C_FOOT_TIME" "$C_HEAD_TIME" "$C_END_TIME" "$C_TITLE"
+      else
+        printf "%6s %-10s %5s %5s %5s %s\n" "$HASH" "$C_TITLE"
+      fi
+
     done < "$LIST"
 
-    echo
-    TOTAL_END_TIME=$(date -u '+%H:%M' -d "@$TOTAL_FOOT_SECONDS" )
-    printf "%6s @ %5s\n" " " "$TOTAL_END_TIME"
+    TIMELINE=$(day-timeline "$BARDAY")
+
+    if [[ "$TOTAL_FOOT_SECONDS" -gt 0 ]]
+    then
+      echo
+      TOTAL_END_TIME=$(date -u '+%H:%M' -d "@$TOTAL_FOOT_SECONDS" )
+      printf "%14s%5s %s\n\n" "$HEAD_DATE" "$TOTAL_END_TIME" "$TIMELINE"
+    fi
 
   rm -f "$LIST"
   rm -f "$DAYS"
@@ -608,11 +833,28 @@ jrnl_new ()
 {
   local FILE
   local TEXT
+  local TIME
 
   [[ -z "$1" ]] && die "[new] empty filename"
   FILE="$1"
 
   mkdir -p "$DIR"
+
+  # set duration time to last journal
+  LAST_FILE=$(jrnl_get_last_file "$DIR")
+  if [[ -e "$LAST_FILE" ]]
+  then
+    LAST_FOOT_TIME=$(jrnl_get_foot_time "$LAST_FILE")
+    if [[ ! -z "$LAST_FOOT_TIME" ]]
+    then
+      LAST_FOOT_SECONDS=$(date -u '+%s' -d "1970-01-01 $LAST_FOOT_TIME")
+      if [[ "$LAST_FOOT_SECONDS" -eq 0 ]]
+      then
+        LAST_TIME=$(jrnltimediff "$LAST_FILE")
+        printf "\n  %s\n" "$LAST_TIME" >> "$LAST_FILE"
+      fi
+    fi
+  fi
 
   if [[ -z "$2" ]]
   then
@@ -650,6 +892,62 @@ jrnl_get_dates ()
   JRNL_YESTERDAY="$YEAR/$YEAR-$MONTH/$YESTERDAY"
 }
 
+jrnl_issue_last_files ()
+{
+  local F
+  local N
+  local T
+  local TMP
+
+  TMP=$(mktemp)
+  N=$(echo "$1" | egrep -o "[0-9]+")
+  [[ -z "$N" ]] && N=10
+
+  find "$JRNL_DIR/$YEAR" -follow -type f -iname "*.$JEXT" \
+    | sort -nr                                            \
+    | head -"$N"                                          \
+    | while read -r F
+  do
+    T=$(jrnl_get_head_timestamp "$F")
+    echo "$T $F"
+  done | sort -nr > "$TMP"
+
+  while read -r _ _ F
+  do
+    head -1 "$F" | egrep -o "\#[0-9]+"
+  done < "$TMP"
+
+  rm -f "$TMP"
+}
+
+jrnl_head_last_files ()
+{
+  local F
+  local N
+  local T
+  local TMP
+
+  TMP=$(mktemp)
+  N=$(echo "$1" | egrep -o "[0-9]+")
+  [[ -z "$N" ]] && N=10
+
+  find "$JRNL_DIR/$YEAR" -follow -type f -iname "*.$JEXT" \
+    | sort -nr                                            \
+    | head -"$N"                                          \
+    | while read -r F
+  do
+    T=$(jrnl_get_head_timestamp "$F")
+    echo "$T $F"
+  done | sort -nr > "$TMP"
+
+  while read -r _ _ F
+  do
+    head -1 "$F"
+  done < "$TMP"
+
+  rm -f "$TMP"
+}
+
 jrnl_view_last_files ()
 {
   local F
@@ -661,9 +959,9 @@ jrnl_view_last_files ()
   N=$(echo "$1" | egrep -o "[0-9]+")
   [[ -z "$N" ]] && N=10
 
-  find "$JRNL_DIR/$YEAR" -type f -iname "*.$JEXT" \
-    | sort -nr                                    \
-    | head -"$N"                                  \
+  find "$JRNL_DIR/$YEAR" -follow -type f -iname "*.$JEXT" \
+    | sort -nr                                            \
+    | head -"$N"                                          \
     | while read -r F
   do
     T=$(jrnl_get_head_timestamp "$F")
@@ -698,7 +996,39 @@ jrnl_get_dates
 DIR="$JRNL_DIR/$JRNL_TODAY"
 [[ ! -d "$DIR" ]] && mkdir -p "$DIR"
 
-[[ -z "$1" ]] && jrnl_new "$DIR/$JRNL_FILE"
+CACHE_HASH="$JRNL_DIR/.cache_hash"
+TMP_INPUT='NONE'
+
+if [[ ! -t 0 ]]
+then
+  TMP_INPUT=$(mktemp)
+
+  > "$TMP_INPUT"
+
+  while IFS= read -r PIPED_INPUT
+  do
+    echo "$PIPED_INPUT" >> "$TMP_INPUT"
+  done
+
+fi
+
+if [[ "$TMP_INPUT" = "NONE" ]]
+then
+  [[ -z "$1" ]] && jrnl_new "$DIR/$JRNL_FILE"
+else
+  case "$1" in
+    new)
+      # FIXME validate header
+      echo "$2"
+      exit
+      # empty timestamp = $DIR/$JRNL_FILE
+      # non empty timestamp = generate FILE from timestamp
+
+      [[ ! -e "$DIR/$JRNL_FILE" ]] && mv -f "$TMP_INPUT" "$DIR/$JRNL_FILE"
+      success "$DIR/$JRNL_FILE"
+      ;;
+  esac
+fi
 
 case "$1" in
   a|all)
@@ -713,6 +1043,9 @@ case "$1" in
   e|edit)
     jrnl_edit "$2"
     ;;
+  f|file)
+    jrnl_file "$2"
+    ;;
   -h)
     jrnl_short_help
     ;;
@@ -722,6 +1055,9 @@ case "$1" in
   l|ls|today)
     jrnl_list "$DIR" "$2"
     ;;
+  m|month)
+    jrnl_last_month "$JRNL_DIR" "$2" "$3"
+    ;;
   n|new)
     echo "$@"
     jrnl_new "$DIR/$JRNL_FILE" "$*"
@@ -729,14 +1065,20 @@ case "$1" in
   rm|remove|del|delete)
     jrnl_delete "$2"
     ;;
+  s|start)
+    jrnl_set_start "$2"
+    ;;
   t|time)
-    jrnl_set_time "$2"
+    jrnl_set_time "$2" "$3"
     ;;
   v|view)
     jrnl_view "$2"
     ;;
   -v|--version)
     jrnl_version
+    ;;
+  w|week)
+    jrnl_last_week "$JRNL_DIR" "$2"
     ;;
   x|fix)
     jrnltimestampfix "$JRNL_DIR"
@@ -745,6 +1087,26 @@ case "$1" in
     DIR="$JRNL_DIR/$JRNL_YESTERDAY"
     jrnl_list "$DIR" "$2"
     ;;
+  Y|year)
+    jrnl_last_year "$JRNL_DIR" "$2"
+    ;;
+  h|head)
+    N=1
+    [[ ! -z "$N" ]] && N=$(echo "$2" | egrep -o "[0-9]+")
+    jrnl_head_last_files "$N"
+    ;;
+  i|issue)
+    N=1
+    [[ ! -z "$N" ]] && N=$(echo "$2" | egrep -o "[0-9]+")
+    jrnl_issue_last_files "$N"
+    ;;
   *)
-    jrnl_view_last_files "$1"
+    N=$(echo "$1" | egrep -o "[0-9]+")
+
+    if [[ ! -z "$N" ]]
+    then
+      jrnl_view_last_files "$N"
+    else
+      die "unknown action: $1"
+    fi
 esac

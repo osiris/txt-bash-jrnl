@@ -1,0 +1,3 @@
+2017-07-22 08:47 fix find last files +find
+
+  @ 00:12 hs

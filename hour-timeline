@@ -1,0 +1,54 @@
+#!/bin/bash
+#
+# This script comes with ABSOLUTELY NO WARRANTY, use at own risk
+# Copyright (C) 2017 Osiris Alejandro Gomez <osiux@osiux.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+
+[[ -z "$1" ]] && exit 1
+[[ -z "$2" ]] && exit 1
+
+declare -a BB
+
+for i in {0..5}
+do
+  BB[$i]=0
+done
+
+H1=$(echo "$1" | cut -d: -f1 | sed 's/^0//g')
+M1=$(echo "$1" | cut -d: -f2 | sed 's/^0//g')
+H2=$(echo "$2" | cut -d: -f1 | sed 's/^0//g')
+M2=$(echo "$2" | cut -d: -f2 | sed 's/^0//g')
+R1=$(( m = (M1+2)/5, m *= 5))
+R2=$(( m = (M2+2)/5, m *= 5))
+
+[[ "$H1" -lt "$H2" ]] && R2=60
+
+i=0
+for T in 10 20 30 40 50 60
+do
+  M=$(( T - 5 ))
+  [[ "$M" -ge "$R1" && "$M" -le "$R2" ]] && BB[$i]=1
+  [[ "$T" -ge "$R1" && "$T" -le "$R2" ]] && BB[$i]=2
+  #echo "$T $R1 $R2 $M $i" ${BB[$i]}
+  i=$((i+1))
+done
+
+N=$(echo "${BB[@]}" | tr -d ' ')
+BAR=$(echo "$N" | sed 's/0/□/g' | sed 's/1/▨/g' | sed 's/2/▣/g' )
+
+echo "$BAR"
+
+# FIXME show N bars four diff (H2 - H1)
