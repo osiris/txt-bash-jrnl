@@ -18,9 +18,14 @@
 
 DEFAULT_JRNL_DIR="$HOME/.jrnl"
 DEFAULT_JRNL_LOCAL_DIR="$PWD/.jrnl"
+DEFAULT_JRNL_ANSI=1
+
+[[ -z "$JRNL_ANSI" ]] && JRNL_ANSI="$DEFAULT_JRNL_ANSI"
 
 JEXT='txt'
 
+set_ansi_colors ()
+{
 # by https://github.com/mathiasbynens/dotfiles
 if tput setaf 1 &> /dev/null
 then
@@ -40,6 +45,7 @@ else
   WHITE="\e[1;37m";
   YELLOW="\e[1;33m";
 fi;
+}
 
 die ()
 {
@@ -90,15 +96,17 @@ jrnl_mkdir ()
   yesno "create $JRNL_DIR" && mkdir "$JRNL_DIR"
 }
 
-jrnl_get_file_by_index ()
+jrnl_find_file_by_index ()
 {
-
   local DIR
-  local FILE
   local HASH
+  local FILE
 
-  DIR="$JRNL_DIR"
-  [[ ! -z "$1" ]] && HASH="$1"
+  [[ -z "$1" ]] && exit 1
+  HASH="$1"
+
+  DIR="$JRNL_DIR/$JRNL_TODAY"
+  [[ ! -z "$2" ]] && DIR="$2"
 
   find "$DIR" -follow -type f -iname "*.$JEXT" | while read -r FILE
   do
@@ -110,7 +118,25 @@ jrnl_get_file_by_index ()
       exit 0
     fi
   done
+}
 
+jrnl_get_file_by_index ()
+{
+  local FILE
+
+  [[ -z "$1" ]] && exit 1
+  HASH="$1"
+
+  FILE=$(jrnl_find_file_by_index "$HASH")
+
+  # FIXME try week/month/year before find all journals
+
+  if [[ -z "$FILE" ]]
+  then
+    FILE=$(jrnl_find_file_by_index "$HASH" "$JRNL_DIR")
+  fi
+
+  echo "$FILE"
 }
 
 jrnl_get_last_file ()
@@ -150,7 +176,14 @@ jrnl_edit ()
 
   [[ ! -e "$FILE" ]] && die "[edit] not found file: $FILE"
 
-  vim -c 'set titlestring=jrnl' -c 'set et' -c '$' -c 'normal A' -c 'startinsert' -c 'put .' "$FILE"
+  vim -c 'set titlestring=jrnl' \
+      -c 'set nopaste'          \
+      -c 'set et'               \
+      -c '$'                    \
+      -c 'normal A'             \
+      -c 'startinsert'          \
+      -c 'put .'                \
+      "$FILE"
 
   success "$FILE"
 }
@@ -322,6 +355,32 @@ Actions:
 EOF
 }
 
+jrnl_add ()
+{
+  local DIR
+  local FILE
+  local DATA
+
+  if [[ -z "$2" ]]
+  then
+    if [[ -z "$1" ]]
+    then
+      die '[add] nothing to do, empty text'
+    else
+      DIR="$JRNL_DIR/$JRNL_TODAY"
+      FILE=$(jrnl_get_last_file "$DIR")
+      DATA="$1"
+    fi
+  else
+    FILE=$(jrnl_get_file_by_index "$1")
+    DATA="$2"
+  fi
+
+  [[ ! -e "$FILE" ]] && die "[add] not found file: $FILE"
+
+  printf "\n%s" "$DATA" >> "$FILE"
+}
+
 jrnl_copy ()
 {
   local DIR
@@ -393,7 +452,6 @@ jrnl_view ()
 {
   local DIR
   local FILE
-  local F
 
   if [[ -z "$1" ]]
   then
@@ -736,6 +794,16 @@ jrnl_list ()
       MAX_COLS=$(tput cols);
       COLS=$(( MAX_COLS - 20 ))
 
+      if [[ "$JRNL_ANSI" -eq 0 ]]
+      then
+
+        HEAD_TITLE=$(echo "$HEAD" \
+         | cut -c 18-$COLS        \
+         | sed -e 's/ :(/ 🙁/g'
+        )
+
+      else
+
       HEAD_TITLE=$(echo "$HEAD" \
         | cut -c 18-$COLS       \
         | sed -e "s/ \`\`\([a-z.\-]\+\)\`\`/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
@@ -762,6 +830,8 @@ jrnl_list ()
         | sed -e "s/ A /${BRIGHT} A ${NORMAL}${YELLOW}/g"         \
         | sed -e 's/ :(/ 🙁/g'
       )
+
+      fi
 
       TITLE="$HEAD_TITLE"
 
@@ -883,13 +953,18 @@ jrnl_get_dates ()
     MONTH="$mm"
     JRNL_FILE="${HH}${MM}${SS}.$JEXT"
     TIMESTAMP="$TODAY $NOW"
+    JRNL_TODAY="$YEAR/$YEAR-$MONTH/$TODAY"
+  done < "$TMP"
+
+  date --date="yesterday" '+%Y %m %d' > "$TMP"
+
+  while read -r YY mm dd
+  do
+    YESTERDAY="$YY-$mm-$dd"
+    JRNL_YESTERDAY="$YY/$YY-$mm/$YESTERDAY"
   done < "$TMP"
 
   rm -f "$TMP"
-
-  JRNL_TODAY="$YEAR/$YEAR-$MONTH/$TODAY"
-  YESTERDAY=$(date --date="yesterday" +%Y-%m-%d)
-  JRNL_YESTERDAY="$YEAR/$YEAR-$MONTH/$YESTERDAY"
 }
 
 jrnl_issue_last_files ()
@@ -977,6 +1052,8 @@ jrnl_view_last_files ()
   rm -f "$TMP"
 }
 
+[[ "$JRNL_ANSI" -eq 1 ]] && set_ansi_colors
+
 if [[ -z "$JRNL_DIR" ]]
 then
 
@@ -1033,6 +1110,9 @@ fi
 case "$1" in
   a|all)
     jrnl_list "$JRNL_DIR" "$2"
+    ;;
+  add)
+    jrnl_add "$2" "$3"
     ;;
   c|copy)
     jrnl_copy "$2"
