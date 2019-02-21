@@ -19,8 +19,10 @@
 DEFAULT_JRNL_DIR="$HOME/.jrnl"
 DEFAULT_JRNL_LOCAL_DIR="$PWD/.jrnl"
 DEFAULT_JRNL_ANSI=1
+DEFAULT_JRNL_PAGER='cat'
 
 [[ -z "$JRNL_ANSI" ]] && JRNL_ANSI="$DEFAULT_JRNL_ANSI"
+[[ -z "$JRNL_PAGER" ]] && JRNL_PAGER="$DEFAULT_JRNL_PAGER"
 
 JEXT='txt'
 
@@ -36,6 +38,7 @@ then
   RED=$(tput setaf 196);
   WHITE=$(tput setaf 231);
   YELLOW=$(tput setaf 11);
+  LIME=$(tput setaf 82);
 else
   NORMAL="\e[0m";
   BRIGHT="\e[1m";
@@ -44,6 +47,7 @@ else
   RED="\e[1;31m";
   WHITE="\e[1;37m";
   YELLOW="\e[1;33m";
+  LIME="\e[1;82m]"
 fi;
 }
 
@@ -105,7 +109,9 @@ jrnl_find_file_by_index ()
   [[ -z "$1" ]] && exit 1
   HASH="$1"
 
-  DIR="$JRNL_DIR/$JRNL_TODAY"
+  # FIXME first find today, yesterday, week, month
+  DIR=$(echo "$JRNL_DIR/$JRNL_TODAY" | rev | cut -d / -f2- | rev)
+
   [[ ! -z "$2" ]] && DIR="$2"
 
   find "$DIR" -follow -type f -iname "*.$JEXT" | while read -r FILE
@@ -128,7 +134,6 @@ jrnl_get_file_by_index ()
   HASH="$1"
 
   FILE=$(jrnl_find_file_by_index "$HASH")
-
   # FIXME try week/month/year before find all journals
 
   if [[ -z "$FILE" ]]
@@ -443,7 +448,7 @@ jrnl_file ()
     FILE=$(jrnl_get_file_by_index "$1")
   fi
 
-  [[ ! -e "$FILE" ]] && die "[view] not found file: $FILE"
+  [[ ! -e "$FILE" ]] && die "[file] not found file: $FILE"
 
   echo "$FILE"
 }
@@ -463,7 +468,7 @@ jrnl_view ()
 
   [[ ! -e "$FILE" ]] && die "[view] not found file: $FILE"
 
-  cat "$FILE"
+  $JRNL_PAGER "$FILE"
 }
 
 jrnl_set_start ()
@@ -632,7 +637,7 @@ jrnl_get_head_date ()
   [[ -z "$1" ]] && die "[get_head_date] empty file"
 
   HEAD_DATE=$(head -1 "$1" | cut -c -11)
-  [[ -z "$HEAD_DATE" ]] && HEAD_DATE="1970-01-01"
+  [[ -z "$HEAD_DATE" ]] && HEAD_DATE='1970-01-01'
 
   echo "$HEAD_DATE"
 }
@@ -644,6 +649,7 @@ jrnl_get_head_time ()
   [[ -z "$1" ]] && die "[get_head_time] empty file"
 
   HEAD_TIME=$(head -1 "$1" | cut -c 12-16)
+  [[ ! "$HEAD_TIME" = *":"* ]] && HEAD_TIME='00:00'
   [[ -z "$HEAD_TIME" ]] && HEAD_TIME="00:00"
 
   echo "$HEAD_TIME"
@@ -742,6 +748,9 @@ jrnl_list ()
   BARDAY=''
 
   [[ -z $JRNL_DONT_SHOW_TIME ]] && JRNL_SHOW_TIME=1
+  [[ -z $JRNL_DONT_SHOW_DETAIL ]] && JRNL_SHOW_DETAIL=1
+  [[ -z $JRNL_BEGIN ]] && BEGIN=8
+  [[ -z $JRNL_END   ]] && END=20
 
   [[ -z "$1" ]] && die
   [[ ! -z "$2" ]] && REGEXP="$2"
@@ -757,7 +766,6 @@ jrnl_list ()
 
   TOTAL_FOOT_SECONDS=0
   TOTAL_FOOT_MINUTES=0
-  MAX_FOOT_MINUTES=0
 
   cd "$LIST_DIR" && find -follow -type f -name "*.$JEXT" \
     | cut -c 3-                                          \
@@ -794,6 +802,9 @@ jrnl_list ()
       MAX_COLS=$(tput cols);
       COLS=$(( MAX_COLS - 20 ))
 
+      if [[ $JRNL_SHOW_DETAIL -eq 1 ]]
+      then
+
       if [[ "$JRNL_ANSI" -eq 0 ]]
       then
 
@@ -808,13 +819,15 @@ jrnl_list ()
         | cut -c 18-$COLS       \
         | sed -e "s/ \`\`\([a-z.\-]\+\)\`\`/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
         | sed -e "s/ \`\([a-zA-Z.\-]\+\)\`/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
-        | sed -e "s/ @\([a-z.\-]\+\)@/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
+        | sed -e "s/ @\([a-z.\-]\+\)@/ ${BRIGHT}${RED}\1${NORMAL}${YELLOW}/g" \
         | sed -e "s/ =\([a-z.\-]\+\)=/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
+        | sed -e "s/#\([0-9]\+\) /${BRIGHT}${BLUE}#\1${NORMAL}${YELLOW} /g" \
         | sed -e "s/ \*\([a-z.\-]\+\)\*/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
         | sed -e "s/ \*\([a-z0-9.\s\-]\+\)\* / ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
-        | sed -e "s/ \(+[a-z]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
+        | sed -e "s/ \(+[a-z_\-]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
         | sed -e "s/ \(\/[a-z0-9\.\/\-]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
         | sed -e "s/ \(@[a-z]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
+        | sed -e "s/\(@[a-z0-9]\+\)/${BRIGHT}${LIME}\1${NORMAL}${YELLOW}/g" \
         | sed -e "s/ \([0-9\-]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
         | sed -e "s/ \([a-z0-9\-]\+\.[a-z0-9]\+\.[a-z0-9]\+\.[a-z]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
         | sed -e "s/ \([a-z0-9\-]\+\.[a-z0-9]\+\.[a-z]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
@@ -828,12 +841,23 @@ jrnl_list ()
         | sed -e "s/ PTR /${BRIGHT} PTR ${NORMAL}${YELLOW}/g"     \
         | sed -e "s/ CNAME /${BRIGHT} CNAME ${NORMAL}${YELLOW}/g" \
         | sed -e "s/ A /${BRIGHT} A ${NORMAL}${YELLOW}/g"         \
+        | sed -e "s/▁/${BRIGHT}▁${NORMAL}${YELLOW}/g" \
+        | sed -e "s/▂/${BRIGHT}▂${NORMAL}${YELLOW}/g" \
+        | sed -e "s/▃/${BRIGHT}▃${NORMAL}${YELLOW}/g" \
+        | sed -e "s/▄/${BRIGHT}▄${NORMAL}${YELLOW}/g" \
+        | sed -e "s/▅/${BRIGHT}▅${NORMAL}${YELLOW}/g" \
+        | sed -e "s/▆/${BRIGHT}▆${NORMAL}${YELLOW}/g" \
+        | sed -e "s/█/${BRIGHT}█${NORMAL}${YELLOW}/g" \
+        | sed -e "s/▅/${BRIGHT}▅${NORMAL}${YELLOW}/g" \
+        | sed -e "s/▆/${BRIGHT}▆${NORMAL}${YELLOW}/g" \
         | sed -e 's/ :(/ 🙁/g'
       )
 
       fi
 
-      TITLE="$HEAD_TITLE"
+      fi
+
+      TITLE="${HEAD_TITLE}${NORMAL}"
 
       [[ "${#HEAD_TITLE}" -gt "$COLS" ]] && TITLE="${TITLE}..."
 
@@ -845,39 +869,32 @@ jrnl_list ()
       END_TIME=$(date -u '+%H:%M' -d "@$END_EPOC" )
       C_END_TIME="${RED}${END_TIME}${NORMAL}"
 
-      ISSUE_ID=$(echo "$HEAD" | egrep -wo "#[0-9]+" | head -1)
-
-      if [[ -z "$ISSUE_ID" ]]
-      then
-        C_TITLE="${YELLOW}${TITLE}${WHITE}"
-      else
-        LI=${#ISSUE_ID}
-        LT=$((LI+1))
-        TITLE=$(echo "$TITLE" | cut -c $LT-)
-        C_TITLE="${BLUE}${ISSUE_ID}${YELLOW}${TITLE}${NORMAL}"
-      fi
       HASH=$(get_hash "$FILE")
       echo "$HASH" >> "$CACHE_HASH"
-      BAR=$(hour-timeline "$HEAD_TIME" "$END_TIME")
-      HEAD_HOUR=$(echo "$HEAD_TIME" | cut -d: -f1)
-      echo "$HEAD_HOUR $BAR" >> "$BARDAY"
+      BARS=$(hour-timeline "$HEAD_TIME" "$END_TIME" | sed 's/▣ /▣\n/g')
+      BAR=$(echo "$BARS" | head -1 | awk '{print $2}')
+      echo "$BARS" >> "$BARDAY"
 
-      if [[ $JRNL_SHOW_TIME -eq 1 ]]
+      if [[ $JRNL_SHOW_DETAIL -eq 1 ]]
       then
-        printf "%6s %-10s %5s %5s %5s %s\n" "$HASH" "$BAR" "$C_FOOT_TIME" "$C_HEAD_TIME" "$C_END_TIME" "$C_TITLE"
-      else
-        printf "%6s %-10s %5s %5s %5s %s\n" "$HASH" "$C_TITLE"
+        if [[ $JRNL_SHOW_TIME -eq 1 ]]
+        then
+          printf "%6s %-10s %5s %5s %5s %s\n" "$HASH" "$BAR" "$C_FOOT_TIME" "$C_HEAD_TIME" "$C_END_TIME" "$TITLE"
+        else
+          printf "%6s %-10s %5s %5s %5s %s\n" "$HASH" "$TITLE"
+        fi
       fi
 
     done < "$LIST"
 
-    TIMELINE=$(day-timeline "$BARDAY")
+    TIMELINE=$(day-timeline "$BARDAY" "$BEGIN" "$END")
 
     if [[ "$TOTAL_FOOT_SECONDS" -gt 0 ]]
     then
-      echo
+      [[ $JRNL_SHOW_DETAIL -eq 1 ]] && echo
       TOTAL_END_TIME=$(date -u '+%H:%M' -d "@$TOTAL_FOOT_SECONDS" )
-      printf "%14s%5s %s\n\n" "$HEAD_DATE" "$TOTAL_END_TIME" "$TIMELINE"
+      printf "%14s%5s %s\n" "$HEAD_DATE" "$TOTAL_END_TIME" "$TIMELINE"
+      [[ $JRNL_SHOW_DETAIL -eq 1 ]] && echo
     fi
 
   rm -f "$LIST"
@@ -903,7 +920,6 @@ jrnl_new ()
 {
   local FILE
   local TEXT
-  local TIME
 
   [[ -z "$1" ]] && die "[new] empty filename"
   FILE="$1"

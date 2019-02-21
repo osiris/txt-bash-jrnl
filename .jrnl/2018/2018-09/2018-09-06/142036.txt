@@ -1,0 +1,3 @@
+2018-09-06 14:20 fix invalid hh:mm in jrnl_get_head_time
+
+  @ 00:32 hs
