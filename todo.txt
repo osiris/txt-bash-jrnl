@@ -17,9 +17,10 @@ add action for append text
 add autocomplete for hash
 quick filter in jrnl all when pattern is a YYYY-MM-DD
 list journals with empty or 00:00 time duration
-complete minutes extra hour eg: 09:48 10:41 return: 9 □□□□▣▣ 10 □□□□▣▣ != 9 □□□□▣▣ 10 ▣▣▣▣▣▣
 add jrnl init command
 add variable for optional disable times and timeline
 add set paste in jrnl edit
 add partail content to last jrnl
 sum time group by issue
+add s/search/replace/g in head of jrnl
+recognize start time HH:MM at new journal
