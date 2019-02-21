@@ -21,9 +21,14 @@ declare -a A B C D E F
 HOURS=$(mktemp)
 TMP=$(mktemp)
 BAR=$(mktemp)
+BEGIN=0
+END=23
 
 [[ -z "$1" ]] && exit 1
 [[ ! -e "$1" ]] && exit 1
+
+[[ ! -z "$2" ]] && BEGIN="$2"
+[[ ! -z "$3" ]] && END="$3"
 
 awk '{print $1}' "$1" | sort -u > "$HOURS"
 
@@ -55,10 +60,22 @@ do
 
   echo "$HOUR" "${A[$HOUR]}" "${B[$HOUR]}" "${C[$HOUR]}" "${D[$HOUR]}" "${E[$HOUR]}" "${F[$HOUR]}"
 
-done < "$HOURS" > "$BAR"
+done < "$HOURS" | sort -n > "$BAR"
 
-while read -r H T
+for i in $(seq "$BEGIN" "$END")
 do
-  printf "%2d %s" "$H" "$(echo -n "$T" | sed 's/0/□/g' | sed 's/1/▨/g' | sed 's/2/▣/g' | tr -d ' ') "
-done < "$BAR"
+  H=$(egrep "^$i " "$BAR" | awk '{print $1}')
+  T=$(egrep "^$i " "$BAR" | cut -d ' ' -f2-)
+
+  if [[ -z "$H" ]]
+  then
+    printf "%s " '□□□□□□'
+  else
+    printf "%s" "$(echo -n "$T" | sed 's/0/□/g' | sed 's/1/▨/g' | sed 's/2/▣/g' | tr -d ' ') "
+  fi
+done
+
+rm -f "$HOURS"
+rm -f "$TMP"
+rm -f "$BAR"
 
