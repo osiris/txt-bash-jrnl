@@ -15,40 +15,90 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-#
 
 [[ -z "$1" ]] && exit 1
 [[ -z "$2" ]] && exit 1
 
-declare -a BB
+gen_bar()
+{
+  local b
+  local i
+  local m
+  local n
+  local t
 
-for i in {0..5}
-do
-  BB[$i]=0
-done
+  declare -a bb
+
+  [[ -z "$1" ]] && exit 1
+  [[ -z "$2" ]] && exit 1
+
+  for i in {0..5}
+  do
+    bb[$i]=0
+  done
+
+  i=0
+  for t in 10 20 30 40 50 60
+  do
+    m=$(( t - 5 ))
+    [[ "$m" -ge "$1" && "$m" -le "$2" ]] && bb[$i]=1
+    [[ "$t" -ge "$1" && "$t" -le "$2" ]] && bb[$i]=2
+    i=$((i+1))
+  done
+
+  n=$(echo "${bb[@]}" | tr -d ' ')
+  b=$(echo "$n" | sed 's/0/□/g' | sed 's/1/▨/g' | sed 's/2/▣/g' )
+
+  echo -n "$b "
+}
+
+gen_first()
+{
+  echo -n "$H1 "
+  gen_bar "$R1" 60
+}
+
+gen_last()
+{
+  echo -n "$H2 "
+  gen_bar 0 "$R2"
+}
+
+gen_between()
+{
+  local d
+  local n
+  local h
+
+  d=$((H2-H1))
+
+  if [[ "$d" -ge 2 ]]
+  then
+    n=$((d-1))
+    for i in $(seq 1 "$n")
+    do
+      h=$((H1+i))
+      echo -n "$h "
+      gen_bar 0 60
+    done
+  fi
+}
 
 H1=$(echo "$1" | cut -d: -f1 | sed 's/^0//g')
 M1=$(echo "$1" | cut -d: -f2 | sed 's/^0//g')
 H2=$(echo "$2" | cut -d: -f1 | sed 's/^0//g')
 M2=$(echo "$2" | cut -d: -f2 | sed 's/^0//g')
+
 R1=$(( m = (M1+2)/5, m *= 5))
 R2=$(( m = (M2+2)/5, m *= 5))
 
-[[ "$H1" -lt "$H2" ]] && R2=60
+if [[ "$H2" -gt "$H1" ]]
+then
+  gen_first
+  gen_between
+  gen_last
+else
+  echo -n "$H1 "
+  gen_bar "$R1" "$R2"
+fi
 
-i=0
-for T in 10 20 30 40 50 60
-do
-  M=$(( T - 5 ))
-  [[ "$M" -ge "$R1" && "$M" -le "$R2" ]] && BB[$i]=1
-  [[ "$T" -ge "$R1" && "$T" -le "$R2" ]] && BB[$i]=2
-  #echo "$T $R1 $R2 $M $i" ${BB[$i]}
-  i=$((i+1))
-done
-
-N=$(echo "${BB[@]}" | tr -d ' ')
-BAR=$(echo "$N" | sed 's/0/□/g' | sed 's/1/▨/g' | sed 's/2/▣/g' )
-
-echo "$BAR"
-
-# FIXME show N bars four diff (H2 - H1)
