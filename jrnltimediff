@@ -17,12 +17,14 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 die() {
-  echo "$1"
+  echo "ERROR $1"
   exit 1
 }
 
-[[   -z "$1" ]] && exit 1
-[[ ! -e "$1" ]] && exit 1
+[[   -z "$1" ]] && die "EMPTY FILE $1"
+[[ ! -e "$1" ]] && die "NOT FOUND FILE $1"
+
+[[ ! -z "$2" ]] && D2="$2"
 
 D1=$(head -1 "$1" | cut -c -16)
 
@@ -34,7 +36,15 @@ VALID_DATE=$(echo "$D1" | egrep -o "[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}
 [[ "$D1" != "$VALID_DATE" ]] && exit 1
 
 E1=$(date --date="$D1" +%s)
-E2=$(date --date='now' +%s)
+
+if [[ -z "$D2" ]]
+then
+  E2=$(date --date='now' +%s)
+else
+  DD=$(echo "$D1" | cut -c -10)
+  E2=$(date --date="$DD $D2" +%s)
+fi
+
 EE=$((E2-E1))
 HM=$(date -d "1970-01-01 $EE seconds" +%H:%M)
 echo "@ $HM hs"

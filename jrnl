@@ -827,7 +827,7 @@ jrnl_list ()
         | sed -e "s/ \(+[a-z_\-]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
         | sed -e "s/ \(\/[a-z0-9\.\/\-]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
         | sed -e "s/ \(@[a-z]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
-        | sed -e "s/\(@[a-z0-9]\+\)/${BRIGHT}${LIME}\1${NORMAL}${YELLOW}/g" \
+        | sed -e "s/\(@[a-z0-9\-]\+\)/${BRIGHT}${LIME}\1${NORMAL}${YELLOW}/g" \
         | sed -e "s/ \([0-9\-]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
         | sed -e "s/ \([a-z0-9\-]\+\.[a-z0-9]\+\.[a-z0-9]\+\.[a-z]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
         | sed -e "s/ \([a-z0-9\-]\+\.[a-z0-9]\+\.[a-z]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \

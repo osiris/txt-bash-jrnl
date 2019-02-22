@@ -1,0 +1,169 @@
+#!/bin/bash
+
+# This script comes with ABSOLUTELY NO WARRANTY, use at own risk
+# Copyright (C) 2019 Osiris Alejandro Gomez <osiris@gcoop.coop>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+DEFAULT_JRNL_DIR="$HOME/.jrnl"
+DEFAULT_JRNL_LOCAL_DIR="$PWD/.jrnl"
+JEXT='txt'
+
+set_ansi_colors ()
+{
+# by https://github.com/mathiasbynens/dotfiles
+if tput setaf 1 &> /dev/null
+then
+  NORMAL=$(tput sgr0);
+  BRIGHT=$(tput bold);
+  BLUE=$(tput setaf 33);
+  GREEN=$(tput setaf 46);
+  RED=$(tput setaf 196);
+  WHITE=$(tput setaf 231);
+  YELLOW=$(tput setaf 11);
+  LIME=$(tput setaf 82);
+else
+  NORMAL="\e[0m";
+  BRIGHT="\e[1m";
+  BLUE="\e[1;34m";
+  GREEN="\e[1;32m";
+  RED="\e[1;31m";
+  WHITE="\e[1;37m";
+  YELLOW="\e[1;33m";
+  LIME="\e[1;82m]"
+fi;
+}
+die ()
+{
+  printf "%s\n" "$RED[ERROR] $1 $NORMAL" && exit 1
+}
+
+info ()
+{
+  printf "%s\n" "$GREEN[OK] $1 $NORMAL"
+}
+
+jrnl_get_dates ()
+{
+  local TMP
+
+  TMP=$(mktemp)
+  date '+%Y %m %d %H %M %S' > "$TMP"
+
+  while read -r YY mm dd HH MM SS
+  do
+    YEAR="$YY"
+    TODAY="$YY-$mm-$dd"
+    NOW="$HH:$MM"
+    MONTH="$mm"
+    JRNL_FILE="${HH}${MM}${SS}.$JEXT"
+    TIMESTAMP="$TODAY $NOW"
+    JRNL_TODAY="$YEAR/$YEAR-$MONTH/$TODAY"
+  done < "$TMP"
+
+  date --date="yesterday" '+%Y %m %d' > "$TMP"
+
+  while read -r YY mm dd
+  do
+    YESTERDAY="$YY-$mm-$dd"
+    JRNL_YESTERDAY="$YY/$YY-$mm/$YESTERDAY"
+  done < "$TMP"
+
+  rm -f "$TMP"
+}
+
+jrnl_get_foot_time ()
+{
+  local FOOT_TIME
+
+  [[ -z "$1" ]] && die "[get_foot_time] empty file"
+
+  FOOT_TIME=$(tail -1 "$1" | egrep -o "^  @ [0-9]{2}:[0-9]{2} hs$" | egrep -o "[0-9:]+")
+  [[ -z "$FOOT_TIME" ]] && FOOT_TIME="00:00"
+
+  echo "$FOOT_TIME"
+}
+
+jrnl_get_head_time ()
+{
+  local HEAD_TIME
+
+  [[ -z "$1" ]] && die "[get_head_time] empty file"
+
+  HEAD_TIME=$(head -1 "$1" | cut -c 12-16)
+  [[ ! "$HEAD_TIME" = *":"* ]] && HEAD_TIME='00:00'
+  [[ -z "$HEAD_TIME" ]] && HEAD_TIME="00:00"
+
+  echo "$HEAD_TIME"
+}
+
+if [[ -z "$JRNL_DIR" ]]
+then
+
+  if [[ ! -d "$DEFAULT_JRNL_LOCAL_DIR" ]]
+  then
+    JRNL_DIR="$DEFAULT_JRNL_DIR"
+  else
+    JRNL_DIR="$DEFAULT_JRNL_LOCAL_DIR"
+  fi
+
+fi
+
+[[ ! -d "$JRNL_DIR" ]] && die "NOT FOUND $JRNL_DIR"
+
+jrnl_get_dates
+
+# FIXME add option for week/month/year
+DIR="$JRNL_DIR/$JRNL_TODAY"
+[[ ! -d "$DIR" ]] && die "NOT FOUND $DIR"
+
+TMP1=$(mktemp)
+TMP2=$(mktemp)
+TMP3=$(mktemp)
+
+find "$DIR" -type f -iname "*.$JEXT" | sort > "$TMP1"
+
+tail -n +2 "$TMP1" > "$TMP2"
+
+[[ ! -e "$TMP1" ]] && exit 1
+[[ ! -e "$TMP2" ]] && exit 1
+
+paste "$TMP1" "$TMP2" > "$TMP3"
+
+[[ ! -e "$TMP3" ]] && exit 1
+
+while read -r FILE NEXT_FILE
+do
+
+  T=$(jrnl_get_foot_time "$FILE")
+  [[ "$T" != "00:00" ]] && continue
+
+  if [[ -e "$NEXT_FILE" ]]
+  then
+    N_H=$(jrnl_get_head_time "$NEXT_FILE")
+    DIFF=$(jrnltimediff "$FILE" "$N_H" | awk '{print $2}')
+  else
+    DIFF=$(jrnltimediff "$FILE" | awk '{print $2}')
+  fi
+
+  [[ "$DIFF" = '00:00' ]] && continue
+
+  VALID_TIME=$(echo "$DIFF" | egrep -o "[0-9]{2}:[0-9]{2}")
+  [[ "$VALID_TIME" != "$DIFF" ]] && die "[fix_time] invalid time: $DIFF"
+
+  MSG="[set_time] set time: $DIFF in file: $FILE"
+  printf "\n  @ %s hs\n" "$DIFF" >> "$FILE" && info "$MSG"
+
+done < "$TMP3"
+

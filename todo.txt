@@ -5,12 +5,10 @@ test jrnl in termux +termux
 add alternative for incomplete date command +termux
 die on unknown action +action
 add option for disable color output +display
-add action for set end time of journal and calculate duration +time
 define list of journals to discount time, like lunch or coffee break +time
 draw activity diagram for general use and integrating with redmine +doc
 set title in vim +vim
 mark journals without duration +time
-add option for create new journal with start time = end time of previuos journal +1m +time
 show a journal when filter return only one result
 create new journal form stdin or pipe
 add action for append text

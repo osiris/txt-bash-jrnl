@@ -8,3 +8,5 @@ x 2017-07-26 replace actual hash with hash of timestamp +time
 x 2017-10-05 set end time in last journal when create a new journal
 x 2017-10-05 List last week journals
 x 2018-10-18 complete minutes extra hour eg: 09:48 10:41 return: 9 □□□□▣▣ 10 □□□□▣▣ != 9 □□□□▣▣ 10 ▣▣▣▣▣▣
+x 2019-02-22 add option for create new journal with start time = end time of previuos journal +1m +time
+x 2019-02-22 add action for set end time of journal and calculate duration +time
