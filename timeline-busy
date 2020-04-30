@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# This script comes with ABSOLUTELY NO WARRANTY, use at own risk
+# Copyright (C) 2019 Osiris Alejandro Gomez <osiux@osiux.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+TMP=$(mktemp)
+
+DEFAULT_JRNL_BEGIN='10'
+DEFAULT_JRNL_END='18'
+BEGIN="$DEFAULT_JRNL_BEGIN"
+END="$DEFAULT_JRNL_END"
+
+[[ ! -z "$JRNL_BEGIN" ]] && BEGIN="$JRNL_BEGIN"
+[[ ! -z "$JRNL_END"   ]] && END="$JRNL_END"
+
+[[ ! -z "$1" ]] && FROM="$1"
+[[ ! -z "$2" ]] && TO="$2"
+
+hour-timeline "$FROM" "$TO" | sed 's/▣ /▣\n/g' > "$TMP"
+day-timeline "$TMP" "$BEGIN" "$END"
+
+rm -f "$TMP"

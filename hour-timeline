@@ -101,4 +101,3 @@ else
   echo -n "$H1 "
   gen_bar "$R1" "$R2"
 fi
-

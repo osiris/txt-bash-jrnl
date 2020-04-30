@@ -1,24 +1,30 @@
-split by day in list all +display
-read regex or patterns from jrnl_highlights +display
-add usage and examples in README +doc
-test jrnl in termux +termux
-add alternative for incomplete date command +termux
-die on unknown action +action
-add option for disable color output +display
-define list of journals to discount time, like lunch or coffee break +time
-draw activity diagram for general use and integrating with redmine +doc
-set title in vim +vim
-mark journals without duration +time
-show a journal when filter return only one result
-create new journal form stdin or pipe
-add action for append text
-add autocomplete for hash
-quick filter in jrnl all when pattern is a YYYY-MM-DD
-list journals with empty or 00:00 time duration
-add jrnl init command
-add variable for optional disable times and timeline
-add set paste in jrnl edit
-add partail content to last jrnl
-sum time group by issue
-add s/search/replace/g in head of jrnl
-recognize start time HH:MM at new journal
+split by day in list all +display @jrnl
+read regex or patterns from jrnl_highlights +display @jrnl
+add usage and examples in README +doc @jrnl
+test jrnl in termux +termux @jrnl
+add alternative for incomplete date command +termux @jrnl
+define list of journals to discount time, like lunch or coffee break +time @jrnl
+draw activity diagram for general use and integrating with redmine +doc @jrnl
+mark journals without duration +time @jrnl
+show a journal when filter return only one result @jrnl
+create new journal form stdin or pipe @jrnl
+add action for append text @jrnl
+add autocomplete for hash @jrnl
+quick filter in jrnl all when pattern is a YYYY-MM-DD @jrnl
+list journals with empty or 00:00 time duration @jrnl
+add jrnl init command @jrnl
+add variable for optional disable times and timeline @jrnl
+add set paste in jrnl edit @jrnl
+add partail content to last jrnl @jrnl
+sum time group by issue @jrnl
+add s/search/replace/g in head of jrnl @jrnl
+recognize start time HH:MM at new journal @jrnl
+adjust time when end_time is greater than or equal start_time of next journal @jrnl
+add option to delete only time of journal @jrnl
+replace bar in tty with X_ @jrnl
+rewrite current timestamp un new jrnl when first argument match with HH:MM
+add autocomplete @context
+2019-10-03 add view last-(1|2|3) jrnl of the day
+2019-10-03 add view first+(1|2|3) jrnl of the day
+2019-10-03 show untracked jrnl between jrnls
+2019-10-03 add adjust (start|duration) time with (+|-)[0-9]+m

@@ -1,0 +1,45 @@
+#!/bin/bash
+
+# This script comes with ABSOLUTELY NO WARRANTY, use at own risk
+# Copyright (C) 2019 Osiris Alejandro Gomez <osiris@gcoop.coop>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+TMP=$(mktemp)
+
+DEFAULT_JRNL_BEGIN='10'
+DEFAULT_JRNL_END='18'
+BEGIN="$DEFAULT_JRNL_BEGIN"
+END="$DEFAULT_JRNL_END"
+
+[[ ! -z "$JRNL_BEGIN" ]] && BEGIN="$JRNL_BEGIN"
+[[ ! -z "$JRNL_END"   ]] && END="$JRNL_END"
+
+if [[ -z "$1" ]]
+then
+  if [[ -z "$2" ]]
+  then
+    > "$TMP"
+    day-timeline "$TMP" "$BEGIN" "$END"
+    exit
+  fi
+fi
+
+hour-timeline "$1" "$2" \
+  | sed 's/▣ /▣\n/g'    > "$TMP"
+
+BAR="$(day-timeline "$TMP" "$BEGIN" "$END" | sed 's/▣/A/g' | sed 's/□/▣/g' | sed 's/A/□/g')"
+printf "%s\n" "$BAR"
+
+rm -f "$TMP"

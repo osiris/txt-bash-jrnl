@@ -1,0 +1,74 @@
+#!/bin/bash
+
+# This script comes with ABSOLUTELY NO WARRANTY, use at own risk
+# Copyright (C) 2019 Osiris Alejandro Gomez <osiux@osiux.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+# REFERENCE
+#
+# https://stackoverflow.com/questions/47918566/how-to-do-binary-addition-in-bash
+
+# EXAMPLE BUSY + BUSY
+#
+# timeline-busy 10:00 12:00
+# ▣▣▣▣▣▣ ▣▣▣▣▣▣ □□□□□□ □□□□□□ □□□□□□ □□□□□□ □□□□□□ □□□□□□ □□□□□□
+# 111111 111111 000000 000000 000000 000000 000000 000000 000000
+#
+# timeline-busy 13:00 18:00
+# 000000 000000 000000 111111 111111 111111 111111 111111 000000
+#
+# timeline-sum "$(timeline-busy 10:00 12:00)" "$(timeline-busy 13:00 18:00)"
+# ▣▣▣▣▣▣ ▣▣▣▣▣▣ □□□□□□ ▣▣▣▣▣▣ ▣▣▣▣▣▣ ▣▣▣▣▣▣ ▣▣▣▣▣▣ ▣▣▣▣▣▣ □□□□□□
+# 111111 111111 000000 111111 111111 111111 111111 111111 000000
+
+# EXAMPLE FREE + BUSY
+#
+# timeline-free 12:00 13:00
+# ▣▣▣▣▣▣ ▣▣▣▣▣▣ □□□□□□ ▣▣▣▣▣▣ ▣▣▣▣▣▣ ▣▣▣▣▣▣ ▣▣▣▣▣▣ ▣▣▣▣▣▣ ▣▣▣▣▣▣
+# 111111 111111 000000 111111 111111 111111 111111 111111 111111
+#
+# timeline-busy 12:30 12:40
+# □□□□□□ □□□□□□ □□▣▣□□ □□□□□□ □□□□□□ □□□□□□ □□□□□□ □□□□□□ □□□□□□
+# 000000 000000 001100 000000 000000 000000 000000 000000 000000
+#
+# timeline-sum "$(timeline-free 12:00 13:00)" "$(timeline-busy 12:30 12:40)"
+# ▣▣▣▣▣▣ ▣▣▣▣▣▣ □□▣▣□□ ▣▣▣▣▣▣ ▣▣▣▣▣▣ ▣▣▣▣▣▣ ▣▣▣▣▣▣ ▣▣▣▣▣▣ ▣▣▣▣▣▣
+# 111111 111111 001100 111111 111111 111111 111111 111111 111111
+
+bin2graph()
+{
+  echo "$1" | fold -w 6 | sed 's/0/□/g' | sed 's/1/▣/g' | tr '\n' ' '
+}
+
+graph2bin()
+{
+  echo "$1" | sed 's/□/0/g' | sed 's/▣/1/g' | tr -d ' '
+}
+
+[[ -z "$1" ]] && exit 1
+A="$1"
+[[ -z "$2" ]] && exit 1
+B="$2"
+
+BA=$(graph2bin "$A")
+BB=$(graph2bin "$B")
+
+HOURS=$(echo "$JRNL_END-$JRNL_BEGIN+1" | bc)
+BOXES=$(echo "$HOURS*6" | bc)
+BS=$(echo "ibase=2;obase=2; $BA+$BB" | bc -l)
+BS=$(printf "%${BOXES}s" "$BS" | tr ' ' '0')
+GB=$(bin2graph "$BS")
+
+printf "%s\n" "$GB"

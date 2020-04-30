@@ -20,9 +20,17 @@ DEFAULT_JRNL_DIR="$HOME/.jrnl"
 DEFAULT_JRNL_LOCAL_DIR="$PWD/.jrnl"
 DEFAULT_JRNL_ANSI=1
 DEFAULT_JRNL_PAGER='cat'
+DEFAULT_JRNL_EDITOR='vim'
+DEFAULT_JRNL_VIM_OPTIONS=" -c 'set titlestring=jrnl' -c 'set nopaste' -c 'set et' -c '$' -c 'normal A' -c 'startinsert' -c 'put .'"
+DEFAULT_JRNL_EMACS_OPTIONS=''
+DEFAULT_JRNL_BEGIN='8'
+DEFAULT_JRNL_END='20'
 
 [[ -z "$JRNL_ANSI" ]] && JRNL_ANSI="$DEFAULT_JRNL_ANSI"
 [[ -z "$JRNL_PAGER" ]] && JRNL_PAGER="$DEFAULT_JRNL_PAGER"
+[[ -z "$JRNL_EDITOR" ]] && JRNL_EDITOR="$DEFAULT_JRNL_EDITOR"
+[[ -z "$JRNL_VIM_OPTIONS" ]] && JRNL_VIM_OPTIONS="$DEFAULT_JRNL_VIM_OPTIONS"
+[[ -z "$JRNL_EMACS_OPTIONS" ]] && JRNL_EMACS_OPTIONS="$DEFAULT_JRNL_EMACS_OPTIONS"
 
 JEXT='txt'
 
@@ -100,6 +108,20 @@ jrnl_mkdir ()
   yesno "create $JRNL_DIR" && mkdir "$JRNL_DIR"
 }
 
+jrnl_regenerate_index()
+{
+  cd "$JRNL_DIR" || die 'regenerate_index'
+
+  echo "jrnl_regenerate_index in $CACHE_HASH ..."
+
+  find -type f -regex ".*/[0-9]+\.${JEXT}" \
+    | cut -c 3-                            \
+    | while read -r i
+      do
+        echo $(head -1 "$i" | cut -c -16 | sha256sum | cut -c -6) "$i"
+      done > "$CACHE_HASH"
+}
+
 jrnl_find_file_by_index ()
 {
   local DIR
@@ -126,6 +148,18 @@ jrnl_find_file_by_index ()
   done
 }
 
+jrnl_get_file_by_cache_hash ()
+{
+  local FILE
+
+  [[ -z "$1" ]] && exit 1
+  HASH="$1"
+
+  FILE=$(grep -w "$HASH" "$CACHE_HASH" | awk '{print $2}' | tail -1)
+
+  [[ -e "$JRNL_DIR/$FILE" ]] && echo "$JRNL_DIR/$FILE"
+}
+
 jrnl_get_file_by_index ()
 {
   local FILE
@@ -133,8 +167,15 @@ jrnl_get_file_by_index ()
   [[ -z "$1" ]] && exit 1
   HASH="$1"
 
+  FILE=$(jrnl_get_file_by_cache_hash "$HASH")
+
+  if [[ ! -z "$FILE" ]]
+  then
+    echo "$FILE"
+    exit 0
+  fi
+
   FILE=$(jrnl_find_file_by_index "$HASH")
-  # FIXME try week/month/year before find all journals
 
   if [[ -z "$FILE" ]]
   then
@@ -181,14 +222,17 @@ jrnl_edit ()
 
   [[ ! -e "$FILE" ]] && die "[edit] not found file: $FILE"
 
-  vim -c 'set titlestring=jrnl' \
-      -c 'set nopaste'          \
-      -c 'set et'               \
-      -c '$'                    \
-      -c 'normal A'             \
-      -c 'startinsert'          \
-      -c 'put .'                \
-      "$FILE"
+  if [[ "$JRNL_EDITOR" = 'vim' ]]
+  then
+    #FIXME JRNL_EDITOR_OPTIONS="$JRNL_VIM_OPTIONS"
+    vim -c 'set titlestring=jrnl' -c 'set nopaste' -c 'set et' -c '$' -c 'normal A' -c 'startinsert' -c 'put .' "$FILE"
+  fi
+
+  if [[ "$JRNL_EDITOR" = 'emacs' ]]
+  then
+    #FIXME JRNL_EDITOR_OPTIONS="$JRNL_EMACS_OPTIONS"
+    emacs "$FILE"
+  fi
 
   success "$FILE"
 }
@@ -747,10 +791,12 @@ jrnl_list ()
   REGEXP=''
   BARDAY=''
 
-  [[ -z $JRNL_DONT_SHOW_TIME ]] && JRNL_SHOW_TIME=1
-  [[ -z $JRNL_DONT_SHOW_DETAIL ]] && JRNL_SHOW_DETAIL=1
-  [[ -z $JRNL_BEGIN ]] && BEGIN=8
-  [[ -z $JRNL_END   ]] && END=20
+  [[ -z "$JRNL_DONT_SHOW_TIME" ]] && JRNL_SHOW_TIME=1
+  [[ -z "$JRNL_DONT_SHOW_DETAIL" ]] && JRNL_SHOW_DETAIL=1
+  BEGIN="$DEFAULT_JRNL_BEGIN"
+  END="$DEFAULT_JRNL_END"
+  [[ ! -z "$JRNL_BEGIN" ]] && BEGIN="$JRNL_BEGIN"
+  [[ ! -z "$JRNL_END"   ]] && END="$JRNL_END"
 
   [[ -z "$1" ]] && die
   [[ ! -z "$2" ]] && REGEXP="$2"
@@ -782,6 +828,9 @@ jrnl_list ()
 
     BARDAY=$(mktemp)
 
+    EPOC_MIN=$(date -u '+%s' -d '1970-01-01 23:59')
+    EPOC_MAX=$(date -u '+%s' -d '1970-01-01 00:00')
+
     while read -r m f
     do
       FILE="$f"
@@ -810,7 +859,7 @@ jrnl_list ()
 
         HEAD_TITLE=$(echo "$HEAD" \
          | cut -c 18-$COLS        \
-         | sed -e 's/ :(/ 🙁/g'
+         | sed -e 's/ :(/ 🙁/g'   \
         )
 
       else
@@ -827,18 +876,19 @@ jrnl_list ()
         | sed -e "s/ \(+[a-z_\-]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
         | sed -e "s/ \(\/[a-z0-9\.\/\-]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
         | sed -e "s/ \(@[a-z]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
-        | sed -e "s/\(@[a-z0-9\-]\+\)/${BRIGHT}${LIME}\1${NORMAL}${YELLOW}/g" \
+        | sed -e "s/\(@[A-Za-z0-9\.\-]\+\)/${BRIGHT}${LIME}\1${NORMAL}${YELLOW}/g" \
         | sed -e "s/ \([0-9\-]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
         | sed -e "s/ \([a-z0-9\-]\+\.[a-z0-9]\+\.[a-z0-9]\+\.[a-z]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
         | sed -e "s/ \([a-z0-9\-]\+\.[a-z0-9]\+\.[a-z]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
         | sed -e "s/ \([a-z0-9\-]\+\.[a-z0-9]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
-        | sed -e "s/ \([a-z0-9\-\.]\+@[a-z0-9\-]\+\.[a-z0-9]\+\.[a-z]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
+        | sed -e "s/ \([a-z0-9\-\.]\+@[a-z0-9\.\-]\+\.[a-z0-9]\+\.[a-z]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
         | sed -e "s/ \([a-z0-9\-\.]\+@[a-z0-9\-]\+\.[a-z]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
         | sed -e "s/ \([a-z]\+\-[a-z]\+\-[a-z0-9]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
         | sed -e "s/ MX /${BRIGHT} MX ${NORMAL}${YELLOW}/g"       \
         | sed -e "s/ CSV /${BRIGHT} MX ${NORMAL}${YELLOW}/g"      \
         | sed -e "s/ NS /${BRIGHT} NS ${NORMAL}${YELLOW}/g"       \
         | sed -e "s/ PTR /${BRIGHT} PTR ${NORMAL}${YELLOW}/g"     \
+        | sed -e "s/ TXT /${BRIGHT} TXT ${NORMAL}${YELLOW}/g"     \
         | sed -e "s/ CNAME /${BRIGHT} CNAME ${NORMAL}${YELLOW}/g" \
         | sed -e "s/ A /${BRIGHT} A ${NORMAL}${YELLOW}/g"         \
         | sed -e "s/▁/${BRIGHT}▁${NORMAL}${YELLOW}/g" \
@@ -870,10 +920,13 @@ jrnl_list ()
       C_END_TIME="${RED}${END_TIME}${NORMAL}"
 
       HASH=$(get_hash "$FILE")
-      echo "$HASH" >> "$CACHE_HASH"
+      # FIXME FULL PATH FILENAMEecho "$HASH $FILE" >> "$CACHE_HASH"
       BARS=$(hour-timeline "$HEAD_TIME" "$END_TIME" | sed 's/▣ /▣\n/g')
       BAR=$(echo "$BARS" | head -1 | awk '{print $2}')
       echo "$BARS" >> "$BARDAY"
+
+      [[ "$HEAD_SECONDS" -lt "$EPOC_MIN" ]] && EPOC_MIN="$HEAD_SECONDS"
+      [[ "$END_EPOC"  -gt "$EPOC_MAX" ]] && EPOC_MAX="$END_EPOC"
 
       if [[ $JRNL_SHOW_DETAIL -eq 1 ]]
       then
@@ -893,7 +946,10 @@ jrnl_list ()
     then
       [[ $JRNL_SHOW_DETAIL -eq 1 ]] && echo
       TOTAL_END_TIME=$(date -u '+%H:%M' -d "@$TOTAL_FOOT_SECONDS" )
-      printf "%14s%5s %s\n" "$HEAD_DATE" "$TOTAL_END_TIME" "$TIMELINE"
+      MAX_TIME=$(date -u '+%H:%M' -d "@$EPOC_MAX")
+      MIN_TIME=$(date -u '+%H:%M' -d "@$EPOC_MIN")
+      printf "%14s%5s %5s %5s %s\n" \
+        "$HEAD_DATE" "$TOTAL_END_TIME" "$MIN_TIME" "$MAX_TIME" "$TIMELINE"
       [[ $JRNL_SHOW_DETAIL -eq 1 ]] && echo
     fi
 
@@ -951,6 +1007,7 @@ jrnl_new ()
     echo "$TIMESTAMP $TEXT" > "$FILE"
   fi
 
+  echo "$(get_hash "$FILE") $JRNL_TODAY/$JRNL_FILE" >> "$CACHE_HASH"
   success "$FILE"
 }
 
@@ -1196,6 +1253,10 @@ case "$1" in
     [[ ! -z "$N" ]] && N=$(echo "$2" | egrep -o "[0-9]+")
     jrnl_issue_last_files "$N"
     ;;
+  X|index)
+   jrnl_regenerate_index
+   exit
+   ;;
   *)
     N=$(echo "$1" | egrep -o "[0-9]+")
 
