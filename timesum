@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # This script comes with ABSOLUTELY NO WARRANTY, use at own risk
 # Copyright (C) 2019 Osiris Alejandro Gomez <osiux@osiux.com>
@@ -28,9 +28,34 @@ SUM=0
 
 for i in $@
 do
-  SUM="$(date -u -d "$EPOCH $i" +%s) + $SUM"
+  HS="$(echo "$i" | cut -d: -f1 | sed 's/^0//g')"
+  MS="$(echo "$i" | cut -d: -f2)"
+  HS=$((HS*3600))
+  MS=$(echo $MS*60 | bc)
+  SUM="$HS + $MS + $SUM"
 done
 
-TOTAL=$(echo "$SUM" | bc)
+if [[ -z "$SUM" ]]
+then
+  echo '00:00' && exit 0
+fi
 
-date -u -d "$EPOCH $TOTAL sec" "+%H:%M"
+TOTAL=$(echo "$SUM" | bc)
+HHMM="$(date -u '+%H:%M' -d @${TOTAL})"
+
+if [[ $TOTAL -ge 86400 ]]
+then
+
+  DAYS="$((TOTAL/86400))"
+  TDAYS="$((DAYS*24))"
+  HH="$(echo "$HHMM" | cut -d: -f1 | sed 's/^0//g')"
+  MM="$(echo "$HHMM" | cut -d: -f2)"
+  TH="$((HH+TDAYS))"
+  HM="$(printf "%02s:%02s" "$TH" "$MM")"
+  echo "$HM"
+
+else
+
+  date -u -d "$EPOCH $TOTAL sec" "+%H:%M"
+
+fi

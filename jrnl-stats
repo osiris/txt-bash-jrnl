@@ -1,0 +1,484 @@
+#!/bin/bash
+
+# This script comes with ABSOLUTELY NO WARRANTY, use at own risk
+# Copyright (C) 2020 Osiris Alejandro Gomez <osiux@osiux.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+# shellcheck disable=SC2086 # Double quote warning
+
+DEFAULT_JRNL_DIR="$HOME/.jrnl"
+DEFAULT_JRNL_LOCAL_DIR="$PWD/.jrnl"
+JEXT='txt'
+
+SHOW_CONTEXTS=0
+SHOW_TAGS=0
+SHOW_ISSUES=0
+
+JRNL_CONTEXTS="$HOME/.cache/jrnl-contexts"
+JRNL_ISSUES="$HOME/.cache/jrnl-issues"
+JRNL_TAGS="$HOME/.cache/jrnl-tags"
+
+JRNL_YESTERDAY_CONTEXTS="$HOME/.cache/jrnl-yesterday-contexts"
+JRNL_YESTERDAY_ISSUES="$HOME/.cache/jrnl-yesterday-issues"
+JRNL_YESTERDAY_TAGS="$HOME/.cache/jrnl-yesterday-tags"
+
+JRNL_TODAY_CONTEXTS="$HOME/.cache/jrnl-today-contexts"
+JRNL_TODAY_ISSUES="$HOME/.cache/jrnl-today-issues"
+JRNL_TODAY_TAGS="$HOME/.cache/jrnl-today-tags"
+
+JRNL_WEEK_CONTEXTS="$HOME/.cache/jrnl-week-contexts"
+JRNL_WEEK_ISSUES="$HOME/.cache/jrnl-week-issues"
+JRNL_WEEK_TAGS="$HOME/.cache/jrnl-week-tags"
+
+JRNL_HHMM_TOTAL_ISSUES="$HOME/.cache/jrnl-hhmm-total-issues"
+JRNL_HHMM_TOTAL_TAGS="$HOME/.cache/jrnl-hhmm-total-tags"
+JRNL_HHMM_TOTAL_CONTEXTS="$HOME/.cache/jrnl-hhmm-total-contexts"
+
+JRNL_MONTH_CONTEXTS="$HOME/.cache/jrnl-month-contexts"
+JRNL_MONTH_ISSUES="$HOME/.cache/jrnl-month-issues"
+JRNL_MONTH_TAGS="$HOME/.cache/jrnl-month-tags"
+
+JRNL_YEAR_CONTEXTS="$HOME/.cache/jrnl-year-contexts"
+JRNL_YEAR_ISSUES="$HOME/.cache/jrnl-year-issues"
+JRNL_YEAR_TAGS="$HOME/.cache/jrnl-year-tags"
+
+true > "$JRNL_CONTEXTS"
+true > "$JRNL_ISSUES"
+true > "$JRNL_TAGS"
+
+debug ()
+{
+  [[ ! -z "$JRNL_DEBUG" ]] && printf "%s\\n" "[DEBUG] $1" >&2
+}
+
+line()
+{
+  printf "%${1}s" | tr ' ' '-'
+}
+
+LI="$(line 17)"
+LD="$(line 8)"
+LH="$(line 7)"
+
+jrnl_get_dates ()
+{
+  local TMP
+
+  TMP=$(mktemp)
+  date '+%Y %m %d %H %M %S' > "$TMP"
+
+  while read -r YY mm dd _ _ _
+  do
+    YEAR="$YY"
+    TODAY="$YY-$mm-$dd"
+    MONTH="$mm"
+    JRNL_TODAY="$YEAR/$YEAR-$MONTH/$TODAY"
+  done < "$TMP"
+
+  date --date="yesterday" '+%Y %m %d' > "$TMP"
+
+  while read -r YY mm dd
+  do
+    YESTERDAY="$YY-$mm-$dd"
+    JRNL_YESTERDAY="$YY/$YY-$mm/$YESTERDAY"
+  done < "$TMP"
+
+  rm -f "$TMP"
+}
+
+jrnl_last_week ()
+{
+  local DIR
+  local DATE
+  local D
+  local M
+  local n
+  local t
+
+  n=1
+  t=$((6*n))
+
+  for D in $(seq "$t" -1 0)
+  do
+    DATE=$(date --date="-$D days" +%Y-%m-%d)
+    M=$(echo "$DATE"| cut -d '-' -f2)
+    DIR="$JRNL_DIR/$YEAR/$YEAR-$M/$DATE"
+
+    [[ ! -d "$DIR" ]] && continue
+    jrnl_fetch_stats "$DIR"
+  done
+  jrnl_group_by "$JRNL_CONTEXTS" > $JRNL_WEEK_CONTEXTS
+  jrnl_group_by "$JRNL_TAGS"     > $JRNL_WEEK_TAGS
+  jrnl_group_by "$JRNL_ISSUES"   > $JRNL_WEEK_ISSUES
+}
+
+jrnl_last_month ()
+{
+  local D
+  local DATE
+  local DIR
+  local M
+  local n
+  local t
+
+  n=1
+  t=$((30*n))
+
+  for D in $(seq "$t" -1 0)
+  do
+    DATE=$(date --date="-$D days" +%Y-%m-%d)
+    M=$(echo "$DATE"| cut -d '-' -f2)
+    DIR="$JRNL_DIR/$YEAR/$YEAR-$M/$DATE"
+
+    [[ ! -d "$DIR" ]] && continue
+    jrnl_fetch_stats "$DIR"
+  done
+
+  jrnl_group_by "$JRNL_CONTEXTS" > $JRNL_MONTH_CONTEXTS
+  jrnl_group_by "$JRNL_TAGS"     > $JRNL_MONTH_TAGS
+  jrnl_group_by "$JRNL_ISSUES"   > $JRNL_MONTH_ISSUES
+
+}
+
+jrnl_last_year ()
+{
+  local D
+  local DATE
+  local DIR
+  local M
+  local Y
+  local n
+  local t
+
+  [[ -z "$3" ]] && n=1
+  t=$((365*n))
+
+  for D in $(seq "$t" -1 0)
+  do
+    DATE=$(date --date="-$D days" +%Y-%m-%d)
+    Y=${D/-*/}
+    M=$(echo "$DATE" | cut -d '-' -f2)
+    DIR="$JRNL_DIR/$Y/$Y-$M/$DATE"
+
+    [[ ! -d "$DIR" ]] && continue
+    jrnl_fetch_stats "$DIR" "$2"
+  done
+  jrnl_group_by "$JRNL_CONTEXTS" > $JRNL_YEAR_CONTEXTS
+  jrnl_group_by "$JRNL_TAGS"     > $JRNL_YEAR_TAGS
+  jrnl_group_by "$JRNL_ISSUES"   > $JRNL_YEAR_ISSUES
+}
+
+jrnl_get_foot_time ()
+{
+  local TIME
+  debug "[${FUNCNAME[0]}] seconds: $1 issue: $2" 
+
+  TIME=$(echo "$1" | grep -oE '^  @ [0-9]{2}:[0-9]{2} hs$' | tr -d ' @hs')
+  [[ -z "$TIME" ]] && TIME='00:00'
+
+  debug "[${FUNCNAME[0]}] time: $TIME"
+  echo "$TIME"
+}
+
+function write_issue()
+{
+  debug "[${FUNCNAME[0]}] seconds: $1 issue: $2" 
+  [[ -z "$1"    ]] && exit
+  [[ "$1" -eq 0 ]] && exit
+  printf "%10d %s\\n" "$1" "$2" >> "$JRNL_ISSUES"
+}
+
+function write_tag()
+{
+  debug "[${FUNCNAME[0]}] seconds: $1 tag: $2" 
+  [[ -z "$1"    ]] && exit
+  [[ "$1" -eq 0 ]] && exit
+  printf "%10d %s\\n" "$1" "$2" >> "$JRNL_TAGS"
+}
+
+function write_context()
+{
+  debug "[${FUNCNAME[0]}] seconds: $1 context: $2" 
+  [[ -z "$1"    ]] && exit
+  [[ -z "$2"    ]] && exit
+  [[ "$1" -eq 0 ]] && exit
+  printf "%10d %s\\n" "$1" "$2" >> "$JRNL_CONTEXTS"
+}
+
+jrnl_fetch_stats()
+{
+
+REGEX=".*/[0-9]+\\.${JEXT}"
+
+find "$1" -type f -regex "$REGEX" \
+  | cut -c 1-                     \
+  | while read -r F
+    do
+      FILE="$(basename "$F")"
+      HEAD="$(head -1 "$F")"
+      FOOT="$(tail -1 "$F")"
+			TITLE="$(echo "$HEAD" | cut -c 18-)"
+      debug "[${FUNCNAME[0]}] file: $FILE title: $TITLE"
+
+      CONTEXT="$(echo "$TITLE" | grep -woE '@[a-z0-9\-]+')"
+      ISSUE="$(echo "$TITLE" | grep -woE '\#[0-9]+' | tr ' ' '\n' | head -1)"
+      TAG="$(echo "$TITLE" | grep -oE '\+[a-z0-9]+')"
+      TIME=$(jrnl_get_foot_time "$FOOT")
+      SECONDS=$(date -u '+%s' -d "1970-01-01 $TIME")
+
+      [[ -z "$TAG"   ]] && TAG='+untag'
+
+      if [[ -z "$CONTEXT" ]]
+      then
+        CONTEXT='@none'
+        [[ ! -z "$ISSUE" ]] && CONTEXT="@$(redmine-get-project $ISSUE)"
+			fi
+
+      [[  -z "$CONTEXT" ]] && CONTEXT='@none'
+
+      debug "[${FUNCNAME[0]}] file: $FILE time: $TIME seconds: $SECONDS context: $CONTEXT tag: $TAG issue: $ISSUE"
+      write_context "$SECONDS" "$CONTEXT"
+      write_tag "$SECONDS" "$TAG"
+      [[ ! -z "$ISSUE" ]] && write_issue "$SECONDS" "$ISSUE"
+
+    done
+
+}
+
+jrnl_group_by()
+{
+  debug "[${FUNCNAME[0]}] file: $1"
+
+  [[ ! -e "$1" ]] && exit 1
+
+  awk '{a[$2]+=$1} END { for (i in a) print a[i], i}' "$1" \
+    | sort -nr -k1 \
+    | while read -r s c
+      do
+        days=0
+        seconds="$s"
+
+        if [[ $s -gt 86400 ]]
+        then
+          days="$((s/86400))"
+          ds="$((days*86400))"
+          seconds=$((s-ds))
+        fi
+
+        t="$(date -u '+%H:%M' -d @${seconds})"
+        tdays=$((days*24))
+        hh="$(echo "$t" | cut -d: -f1 | sed 's/^0//g')"
+        mm="$(echo "$t" | cut -d: -f2)"
+        th=$((hh+tdays))
+        hm="$(printf "%02s:%02s" "$th" "$mm")"
+        echo "$hm" "$c"
+
+      done
+}
+
+jrnl_get_dates
+
+if [[ -z "$JRNL_DIR" ]]
+then
+
+  if [[ ! -d "$DEFAULT_JRNL_LOCAL_DIR" ]]
+  then
+ 	 JRNL_DIR="$DEFAULT_JRNL_DIR"
+  else
+ 	 JRNL_DIR="$DEFAULT_JRNL_LOCAL_DIR"
+  fi
+
+fi
+
+jrnl_yesterday()
+{
+  DIR="$JRNL_DIR/$JRNL_YESTERDAY"
+  cd "$DIR" || exit 1
+  jrnl_fetch_stats "$DIR"
+  jrnl_group_by "$JRNL_CONTEXTS" > "$JRNL_YESTERDAY_CONTEXTS"
+  jrnl_group_by "$JRNL_TAGS"     > "$JRNL_YESTERDAY_TAGS"
+  jrnl_group_by "$JRNL_ISSUES"   > "$JRNL_YESTERDAY_ISSUES"
+}
+
+jrnl_today()
+{
+  DIR="$JRNL_DIR/$JRNL_TODAY"
+  cd "$DIR" || exit 1
+  jrnl_fetch_stats "$DIR"
+  jrnl_group_by "$JRNL_CONTEXTS" > $JRNL_TODAY_CONTEXTS
+  jrnl_group_by "$JRNL_TAGS"     > $JRNL_TODAY_TAGS
+  jrnl_group_by "$JRNL_ISSUES"   > $JRNL_TODAY_ISSUES
+}
+
+table_head()
+{
+  printf "\\n| %15s | %6s | %6s | %5s | %5s |\\n" "$1" "month" "week" "yday" "today"
+}
+
+table_div()
+{
+  printf "|%17s|%6s|%6s|%5s|%5s|\\n" "$LI" "$LD" "$LD" "$LH" "$LH"
+}
+
+table_row()
+{
+  printf "| %15s | %6s | %6s | %5s | %5s |\\n" "$1" "$2" "$3" "$4" "$5"
+}
+
+jrnl_stats_get()
+{
+  local TIME
+  debug "[${FUNCNAME[0]}] context: $1 file: $2"
+  
+  TIME="$(grep -w "$1" "$2" | awk '{print $1}')"
+
+  debug "[${FUNCNAME[0]}] time: $TIME"
+  echo "$TIME"
+}
+
+jrnl_stats_contexts()
+{
+
+table_head 'contexts'
+table_div
+
+SM=''
+SW=''
+SY=''
+ST=''
+
+awk '{print $2}' "$JRNL_MONTH_CONTEXTS" > "$JRNL_HHMM_TOTAL_CONTEXTS"
+
+while read -r C
+do
+  [[ -z "$C" ]] && continue
+
+  debug "[${FUNCNAME[0]}] context: $C" 
+
+  M="$(jrnl_stats_get "$C" "$JRNL_MONTH_CONTEXTS"    )"
+  W="$(jrnl_stats_get "$C" "$JRNL_WEEK_CONTEXTS"     )"
+  Y="$(jrnl_stats_get "$C" "$JRNL_YESTERDAY_CONTEXTS")"
+  T="$(jrnl_stats_get "$C" "$JRNL_TODAY_CONTEXTS"    )"
+  SM="$SM $M"
+  SW="$SW $W"
+  SY="$SY $Y"
+  ST="$ST $T"
+  table_row "$C" "$M" "$W" "$Y" "$T"
+done < "$JRNL_HHMM_TOTAL_CONTEXTS"
+
+  TSM="$(timesum $SM)"
+  TSW="$(timesum $SW)"
+  TSY="$(timesum $SY)"
+  TST="$(timesum $ST)"
+
+  table_div
+  table_row 'total' "$TSM" "$TSW" "$TSY" "$TST"
+}
+
+jrnl_stats_tags()
+{
+
+table_head 'tags'
+table_div
+
+SM=''
+SW=''
+SY=''
+ST=''
+
+awk '{print $2}' "$JRNL_MONTH_TAGS" > "$JRNL_HHMM_TOTAL_TAGS"
+
+while read -r C
+do
+  M="$(jrnl_stats_get "$C" "$JRNL_MONTH_TAGS"    )"
+  W="$(jrnl_stats_get "$C" "$JRNL_WEEK_TAGS"     )"
+  Y="$(jrnl_stats_get "$C" "$JRNL_YESTERDAY_TAGS")"
+  T="$(jrnl_stats_get "$C" "$JRNL_TODAY_TAGS"    )"
+  SM="$SM $M"
+  SW="$SW $W"
+  SY="$SY $Y"
+  ST="$ST $T"
+  table_row "$C" "$M" "$W" "$Y" "$T"
+done < "$JRNL_HHMM_TOTAL_TAGS"
+
+  TSM="$(timesum $SM)"
+  TSW="$(timesum $SW)"
+  TSY="$(timesum $SY)"
+  TST="$(timesum $ST)"
+
+  table_div
+  table_row 'total' "$TSM" "$TSW" "$TSY" "$TST"
+
+}
+
+jrnl_stats_issues()
+{
+
+table_head 'issues'
+table_div
+
+SM=''
+SW=''
+SY=''
+ST=''
+
+awk '{print $2}' "$JRNL_MONTH_ISSUES" > "$JRNL_HHMM_TOTAL_ISSUES"
+
+while read -r C
+do
+  M="$(jrnl_stats_get "$C" "$JRNL_MONTH_ISSUES"    )"
+  W="$(jrnl_stats_get "$C" "$JRNL_WEEK_ISSUES"     )"
+  Y="$(jrnl_stats_get "$C" "$JRNL_YESTERDAY_ISSUES")"
+  T="$(jrnl_stats_get "$C" "$JRNL_TODAY_ISSUES"    )"
+  SM="$SM $M"
+  SW="$SW $W"
+  SY="$SY $Y"
+  ST="$ST $T"
+  table_row "$C" "$M" "$W" "$Y" "$T"
+done < "$JRNL_HHMM_TOTAL_ISSUES"
+
+  TSM="$(timesum $SM)"
+  TSW="$(timesum $SW)"
+  TSY="$(timesum $SY)"
+  TST="$(timesum $ST)"
+
+  table_div
+  table_row 'total' "$TSM" "$TSW" "$TSY" "$TST"
+}
+
+case "$1" in
+  c|contexts)
+    SHOW_CONTEXTS=1
+    ;;
+  t|tags)
+    SHOW_TAGS=1
+    ;;
+  i|issues)
+    SHOW_ISSUES=1
+    ;;
+  *)
+    SHOW_CONTEXTS=1
+    SHOW_TAGS=1
+    ;;
+esac
+
+jrnl_yesterday
+jrnl_today
+jrnl_last_week
+jrnl_last_month
+
+[[ "$SHOW_CONTEXTS" -eq 1 ]] && jrnl_stats_contexts
+[[ "$SHOW_TAGS"     -eq 1 ]] && jrnl_stats_tags
+[[ "$SHOW_ISSUES"   -eq 1 ]] && jrnl_stats_issues
