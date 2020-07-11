@@ -866,7 +866,7 @@ jrnl_list ()
 
       HEAD_TITLE=$(echo "$HEAD" \
         | cut -c 18-$COLS       \
-        | sed -e "s/ \`\`\([a-z.\-]\+\)\`\`/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
+        | sed -e "s/ \`\`\([a-z._\-]\+\)\`\`/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
         | sed -e "s/ \`\([a-zA-Z.\-]\+\)\`/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
         | sed -e "s/ @\([a-z.\-]\+\)@/ ${BRIGHT}${RED}\1${NORMAL}${YELLOW}/g" \
         | sed -e "s/ =\([a-z.\-]\+\)=/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
