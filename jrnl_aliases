@@ -32,6 +32,7 @@ alias jm='jrnl month'
 alias jms='JRNL_DONT_SHOW_DETAIL=1 jrnl month'
 alias jn='jrnl new'
 alias jr='jrnl rm'
+alias js='jrnl-stats'
 alias jt='jrnl time'
 alias jv='jrnl view'
 alias jw='jrnl week'
@@ -41,3 +42,10 @@ alias td='timediff'
 alias jwt='JRNL_DONT_SHOW_DETAIL=1 jrnl week'
 alias jmt='JRNL_DONT_SHOW_DETAIL=1 jrnl month'
 alias jyt='JRNL_DONT_SHOW_DETAIL=1 jrnl year'
+
+function jclip()
+{
+
+  [[ -z "$1" ]] || jrnl view $1 | xclip -sel clip
+
+}
