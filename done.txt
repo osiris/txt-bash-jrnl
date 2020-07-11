@@ -16,3 +16,4 @@ x 2020-04-30 die on unknown action +action @jrnl
 x 2020-04-30 generate index with hash:path/to/file/name.txt
 x 2020-04-30 set title in vim +vim @jrnl
 x 2020-04-30 add free/busy timeline sum
+x 2020-07-11 sum time group by issue @jrnl

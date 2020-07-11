@@ -16,7 +16,6 @@ add jrnl init command @jrnl
 add variable for optional disable times and timeline @jrnl
 add set paste in jrnl edit @jrnl
 add partail content to last jrnl @jrnl
-sum time group by issue @jrnl
 add s/search/replace/g in head of jrnl @jrnl
 recognize start time HH:MM at new journal @jrnl
 adjust time when end_time is greater than or equal start_time of next journal @jrnl
@@ -28,3 +27,7 @@ add autocomplete @context
 2019-10-03 add view first+(1|2|3) jrnl of the day
 2019-10-03 show untracked jrnl between jrnls
 2019-10-03 add adjust (start|duration) time with (+|-)[0-9]+m
+add autocomplete hash https://iridakos.com/programming/2018/03/01/bash-programmable-completion-tutorial
+verify duplicated entries in .cache_hash
+add regenerate_index por today, week or month by default
+fixme bad sum in jrnl-today-contexts
