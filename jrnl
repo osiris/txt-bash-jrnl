@@ -1027,6 +1027,7 @@ jrnl_get_dates ()
     JRNL_FILE="${HH}${MM}${SS}.$JEXT"
     TIMESTAMP="$TODAY $NOW"
     JRNL_TODAY="$YEAR/$YEAR-$MONTH/$TODAY"
+    JRNL_MONTH="$YEAR/$YEAR-$MONTH"
   done < "$TMP"
 
   date --date="yesterday" '+%Y %m %d' > "$TMP"
@@ -1123,6 +1124,20 @@ jrnl_view_last_files ()
   done < "$TMP"
 
   rm -f "$TMP"
+}
+
+jrnl_get_last_foot_time()
+{
+  local HEAD_TIME
+  local FOOT_TIME
+  local FILE
+
+  FILE="$(jrnl_file)"
+  HEAD_TIME="$(jrnl_get_head_time $FILE)"
+  FOOT_TIME="$(jrnl_get_foot_time $FILE)"
+
+  [[ -z "$FOOT_TIME" ]] && FOOT_TIME="$(timediff "$HEAD_TIME" "$NOW")"
+  echo "$FOOT_TIME"
 }
 
 [[ "$JRNL_ANSI" -eq 1 ]] && set_ansi_colors
@@ -1252,6 +1267,10 @@ case "$1" in
     N=1
     [[ ! -z "$N" ]] && N=$(echo "$2" | egrep -o "[0-9]+")
     jrnl_issue_last_files "$N"
+    ;;
+  T|foot-time)
+    jrnl_get_last_foot_time
+    exit
     ;;
   X|index)
    jrnl_regenerate_index
