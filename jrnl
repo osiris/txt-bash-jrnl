@@ -69,6 +69,11 @@ success ()
   printf "%s" "$GREEN[OK] $1 $NORMAL" && exit 0
 }
 
+debug ()
+{
+  [[ ! -z "$JRNL_DEBUG" ]] && printf "%s\\n" "[DEBUG] $1" >&2
+}
+
 yesno ()
 {
   [[ -t 0 ]] || return 0
@@ -1135,9 +1140,10 @@ jrnl_get_last_foot_time()
   FILE="$(jrnl_file)"
   HEAD_TIME="$(jrnl_get_head_time $FILE)"
   FOOT_TIME="$(jrnl_get_foot_time $FILE)"
-
-  [[ -z "$FOOT_TIME" ]] && FOOT_TIME="$(timediff "$HEAD_TIME" "$NOW")"
+  debug "[${FUNCNAME[0]}] file: $FILE head: $HEAD_TIME foot: $FOOT_TIME"
+  [[ "$FOOT_TIME" = '00:00' ]] && FOOT_TIME="$(timediff "$HEAD_TIME" "$NOW")"
   echo "$FOOT_TIME"
+  debug "[${FUNCNAME[0]}] return: $FOOT_TIME"
 }
 
 [[ "$JRNL_ANSI" -eq 1 ]] && set_ansi_colors
