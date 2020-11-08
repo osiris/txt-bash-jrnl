@@ -1,0 +1,20 @@
+#!/bin/bash
+
+_script()
+{
+  TODAY="$(date +%F)"
+  YESTERDAY="$(date +%F -d yesterday)"
+  MONTH="$(date +%Y-%m)"
+  _script_commands=$(grep -E "($TODAY|$YESTERDAY|$MONTH)" ~/.jrnl/.cache_hash)
+
+  local cur
+  COMPREPLY=()
+  cur="${COMP_WORDS[COMP_CWORD]}"
+  COMPREPLY=( $(compgen -W "${_script_commands}" -- ${cur}) )
+
+  return 0
+}
+complete -o nospace -F _script jrnl
+complete -o nospace -F _script je
+complete -o nospace -F _script jv
+complete -o nospace -F _script jc
