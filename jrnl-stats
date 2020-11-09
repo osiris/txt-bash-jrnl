@@ -18,13 +18,19 @@
 
 # shellcheck disable=SC2086 # Double quote warning
 
+DIR_BIN=$(dirname "$0") && source "$DIR_BIN/jrnl-common"
+
 DEFAULT_JRNL_DIR="$HOME/.jrnl"
 DEFAULT_JRNL_LOCAL_DIR="$PWD/.jrnl"
 JEXT='txt'
 
 SHOW_CONTEXTS=0
-SHOW_TAGS=0
 SHOW_ISSUES=0
+SHOW_MONTH=0
+SHOW_TAGS=0
+SHOW_TODAY=0
+SHOW_WEEK=0
+SHOW_YESTERDAY=0
 
 JRNL_CONTEXTS="$HOME/.cache/jrnl-contexts"
 JRNL_ISSUES="$HOME/.cache/jrnl-issues"
@@ -57,6 +63,41 @@ JRNL_YEAR_TAGS="$HOME/.cache/jrnl-year-tags"
 true > "$JRNL_CONTEXTS"
 true > "$JRNL_ISSUES"
 true > "$JRNL_TAGS"
+
+set_ansi_colors ()
+{
+# by https://github.com/mathiasbynens/dotfiles
+if tput setaf 1 &> /dev/null
+then
+  NORMAL=$(tput sgr0);
+  BRIGHT=$(tput bold);
+  BLUE=$(tput setaf 33);
+  GREEN=$(tput setaf 46);
+  RED=$(tput setaf 196);
+  WHITE=$(tput setaf 231);
+  YELLOW=$(tput setaf 11);
+  LIME=$(tput setaf 82);
+else
+  NORMAL="\e[0m";
+  BRIGHT="\e[1m";
+  BLUE="\e[1;34m";
+  GREEN="\e[1;32m";
+  RED="\e[1;31m";
+  WHITE="\e[1;37m";
+  YELLOW="\e[1;33m";
+  LIME="\e[1;82m]"
+fi;
+}
+
+die ()
+{
+  printf "%s" "$RED[ERROR] $1 $NORMAL" && exit 1
+}
+
+success ()
+{
+  printf "%s" "$GREEN[OK] $1 $NORMAL" && exit 0
+}
 
 debug ()
 {
@@ -219,8 +260,8 @@ function write_context()
 
 jrnl_fetch_stats()
 {
-
-REGEX=".*/[0-9]+\\.${JEXT}"
+  debug "[${FUNCNAME[0]}] dir: $1"
+  REGEX=".*/[0-9]+\\.${JEXT}"
 
 find "$1" -type f -regex "$REGEX" \
   | cut -c 1-                     \
@@ -305,7 +346,7 @@ fi
 jrnl_yesterday()
 {
   DIR="$JRNL_DIR/$JRNL_YESTERDAY"
-  cd "$DIR" || exit 1
+  cd "$DIR" || die "change to directory: $DIR"
   jrnl_fetch_stats "$DIR"
   jrnl_group_by "$JRNL_CONTEXTS" > "$JRNL_YESTERDAY_CONTEXTS"
   jrnl_group_by "$JRNL_TAGS"     > "$JRNL_YESTERDAY_TAGS"
@@ -315,7 +356,7 @@ jrnl_yesterday()
 jrnl_today()
 {
   DIR="$JRNL_DIR/$JRNL_TODAY"
-  cd "$DIR" || exit 1
+  cd "$DIR" || die "change to directory: $DIR"
   jrnl_fetch_stats "$DIR"
   jrnl_group_by "$JRNL_CONTEXTS" > $JRNL_TODAY_CONTEXTS
   jrnl_group_by "$JRNL_TAGS"     > $JRNL_TODAY_TAGS
@@ -458,27 +499,48 @@ done < "$JRNL_HHMM_TOTAL_ISSUES"
   table_row 'total' "$TSM" "$TSW" "$TSY" "$TST"
 }
 
-case "$1" in
+for arg; do
+
+case "$arg" in
   c|contexts)
     SHOW_CONTEXTS=1
     ;;
-  t|tags)
+  g|tags)
     SHOW_TAGS=1
     ;;
   i|issues)
     SHOW_ISSUES=1
     ;;
-  *)
-    SHOW_CONTEXTS=1
-    SHOW_TAGS=1
+  y|yesterday)
+    SHOW_YESTERDAY=1
+    ;;
+  m|month)
+    SHOW_MONTH=1
+    ;;
+  w|week)
+    SHOW_WEEK=1
+    ;;
+  t|today)
+    SHOW_TODAY=1
     ;;
 esac
 
-jrnl_yesterday
-jrnl_today
-jrnl_last_week
-jrnl_last_month
+done
 
-[[ "$SHOW_CONTEXTS" -eq 1 ]] && jrnl_stats_contexts
-[[ "$SHOW_TAGS"     -eq 1 ]] && jrnl_stats_tags
-[[ "$SHOW_ISSUES"   -eq 1 ]] && jrnl_stats_issues
+debug "SHOW_CONTEXTS: $SHOW_CONTEXTS"
+debug "SHOW_ISSUES: $SHOW_ISSUES"
+debug "SHOW_TAGS: $SHOW_TAGS"
+
+debug "SHOW_MONTH: $SHOW_MONTH"
+debug "SHOW_TODAY: $SHOW_TODAY"
+debug "SHOW_WEEK: $SHOW_WEEK"
+debug "SHOW_YESTERDAY: $SHOW_YESTERDAY"
+
+[[ "$SHOW_MONTH"     -eq 1 ]] && jrnl_last_month
+[[ "$SHOW_TODAY"     -eq 1 ]] && jrnl_yesterday
+[[ "$SHOW_WEEK"      -eq 1 ]] && jrnl_last_week
+[[ "$SHOW_YESTERDAY" -eq 1 ]] && jrnl_today
+
+[[ "$SHOW_CONTEXTS"  -eq 1 ]] && jrnl_stats_contexts
+[[ "$SHOW_TAGS"      -eq 1 ]] && jrnl_stats_tags
+[[ "$SHOW_ISSUES"    -eq 1 ]] && jrnl_stats_issues
