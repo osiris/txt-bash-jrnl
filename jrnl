@@ -115,7 +115,9 @@ jrnl_mkdir ()
 
 jrnl_regenerate_index()
 {
-  cd "$JRNL_DIR" || die 'regenerate_index'
+  debug "[${FUNCNAME[0]}] dir: $1"
+
+  cd "$JRNL_DIR/$1" || die 'regenerate_index'
 
   echo "jrnl_regenerate_index in $CACHE_HASH ..."
 
