@@ -898,6 +898,9 @@ jrnl_list ()
         | sed -e "s/ TXT /${BRIGHT} TXT ${NORMAL}${YELLOW}/g"     \
         | sed -e "s/ CNAME /${BRIGHT} CNAME ${NORMAL}${YELLOW}/g" \
         | sed -e "s/ A /${BRIGHT} A ${NORMAL}${YELLOW}/g"         \
+        | sed -e "s/ \(pve[A-Z0-9\-]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
+        | sed -e "s/ \(iDRAC[A-Z0-9\-]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
+        | sed -e "s/ \(ansible_[a-z\_]\+\)/ ${BRIGHT}\1${NORMAL}${YELLOW}/g" \
         | sed -e "s/▁/${BRIGHT}▁${NORMAL}${YELLOW}/g" \
         | sed -e "s/▂/${BRIGHT}▂${NORMAL}${YELLOW}/g" \
         | sed -e "s/▃/${BRIGHT}▃${NORMAL}${YELLOW}/g" \
