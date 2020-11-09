@@ -125,7 +125,7 @@ jrnl_regenerate_index()
     | cut -c 3-                            \
     | while read -r i
       do
-        echo $(head -1 "$i" | cut -c -16 | sha256sum | cut -c -6) "$i"
+        echo $(head -1 "$i" | cut -c -16 | sha256sum | cut -c -6) "$1/$i"
       done > "$CACHE_HASH"
 }
 
@@ -1281,8 +1281,9 @@ case "$1" in
     exit
     ;;
   X|index)
-   jrnl_regenerate_index
-   exit
+    # FIXME
+    jrnl_regenerate_index "$JRNL_MONTH"
+    exit
    ;;
   *)
     N=$(echo "$1" | egrep -o "[0-9]+")
