@@ -453,7 +453,7 @@ jrnl_copy ()
 
   [[ ! -e "$OLD_FILE" ]] && die "[copy] not found file: $OLD_FILE"
 
-  TITLE=$(head -1 "$OLD_FILE" | cut -c 16-)
+  TITLE=$(head -1 "$OLD_FILE" | cut -c 18-)
 
   NEW_FILE="$JRNL_DIR/$JRNL_TODAY/$JRNL_FILE"
 
